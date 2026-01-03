@@ -10,6 +10,8 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var appState: AppState
+    @StateObject private var serverViewModel = ServerConnectionViewModel()
+    @State private var showServerConnection = false
     
     var body: some View {
         NavigationView {
@@ -65,6 +67,22 @@ struct HomeView: View {
                         .font(.headline)
                         .foregroundColor(themeManager.currentTheme.textColor)
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showServerConnection = true
+                    }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(themeManager.currentTheme.accentColor)
+                    }
+                }
+            }
+            .sheet(isPresented: $showServerConnection) {
+                ServerConnectionView()
+                    .environmentObject(themeManager)
+            }
+            .onAppear {
+                serverViewModel.loadSavedServer()
             }
         }
         .applyTheme(themeManager.currentTheme)

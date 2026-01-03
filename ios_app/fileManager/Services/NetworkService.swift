@@ -10,10 +10,25 @@ import Foundation
 class NetworkService {
     static let shared = NetworkService()
     
-    private var baseURL: String {
+    private var baseURL: String? {
+        didSet {
+            if let url = baseURL {
+                UserDefaults.standard.set(url, forKey: "backendBaseURL")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "backendBaseURL")
+            }
+        }
+    }
+    
+    private var effectiveBaseURL: String {
+        // First try saved base URL
+        if let savedURL = baseURL ?? UserDefaults.standard.string(forKey: "backendBaseURL") {
+            return savedURL
+        }
+        
         // Try to read from Config.xcconfig file
         if let configPath = Bundle.main.path(forResource: "Config", ofType: "xcconfig"),
-           let content = try? String(contentsOfFile: configPath) {
+           let content = try? String(contentsOfFile: configPath, encoding: .utf8) {
             for line in content.components(separatedBy: .newlines) {
                 if line.contains("BACKEND_BASE_URL") && !line.trimmingCharacters(in: .whitespaces).starts(with: "//") {
                     let components = line.components(separatedBy: "=")
@@ -24,8 +39,12 @@ class NetworkService {
             }
         }
         
-        // Fallback to default or read from UserDefaults
-        return UserDefaults.standard.string(forKey: "backendBaseURL") ?? "http://localhost:5000"
+        // Fallback to default
+        return "http://localhost:5000"
+    }
+    
+    func setBaseURL(_ url: String?) {
+        self.baseURL = url
     }
     
     private let session: URLSession
@@ -35,12 +54,59 @@ class NetworkService {
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 60
         self.session = URLSession(configuration: configuration)
+        
+        // Load saved URL on init
+        if let savedURL = UserDefaults.standard.string(forKey: "backendBaseURL") {
+            self.baseURL = savedURL
+        }
+    }
+    
+    // MARK: - Server Connection
+    
+    func testConnection(to url: String) async throws -> Bool {
+        guard let testURL = URL(string: "\(url)/") else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: testURL)
+        request.timeoutInterval = 10
+        
+        let (_, response) = try await session.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            return httpResponse.statusCode == 200 || httpResponse.statusCode == 404 // 404 is OK, means server is responding
+        }
+        return false
+    }
+    
+    func fetchServerInfo(from url: String) async throws -> ServerInfo {
+        guard let infoURL = URL(string: "\(url)/api/info") else {
+            throw NetworkError.invalidURL
+        }
+        
+        let (data, response) = try await session.data(from: infoURL)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        // If endpoint doesn't exist, return default info
+        if httpResponse.statusCode == 404 {
+            return ServerInfo(name: nil, version: nil, features: nil)
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.httpError(httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        return try decoder.decode(ServerInfo.self, from: data)
     }
     
     // MARK: - Connection Check
     
     func checkConnection() async throws -> Bool {
-        let url = URL(string: "\(baseURL)/")!
+        let url = URL(string: "\(effectiveBaseURL)/")!
         let (_, response) = try await session.data(from: url)
         
         if let httpResponse = response as? HTTPURLResponse {
@@ -52,7 +118,7 @@ class NetworkService {
     // MARK: - File Explorer
     
     func fetchFileList(path: String = "") async throws -> FileListResponse {
-        var urlString = "\(baseURL)/explorer"
+        var urlString = "\(effectiveBaseURL)/explorer"
         if !path.isEmpty {
             urlString += "/\(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path)"
         }
@@ -85,7 +151,7 @@ class NetworkService {
     }
     
     func downloadFile(path: String) async throws -> Data {
-        let urlString = "\(baseURL)/download/\(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path)"
+        let urlString = "\(effectiveBaseURL)/download/\(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path)"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }
@@ -103,7 +169,7 @@ class NetworkService {
     // MARK: - Notes
     
     func fetchNotes() async throws -> [Note] {
-        let urlString = "\(baseURL)/api/notes"
+        let urlString = "\(effectiveBaseURL)/api/notes"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }
@@ -121,7 +187,7 @@ class NetworkService {
     }
     
     func fetchNote(id: Int) async throws -> Note {
-        let urlString = "\(baseURL)/api/notes/\(id)"
+        let urlString = "\(effectiveBaseURL)/api/notes/\(id)"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }
@@ -139,7 +205,7 @@ class NetworkService {
     }
     
     func createNote(title: String, content: String) async throws -> Note {
-        let urlString = "\(baseURL)/api/notes"
+        let urlString = "\(effectiveBaseURL)/api/notes"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }
@@ -164,7 +230,7 @@ class NetworkService {
     }
     
     func updateNote(id: Int, title: String, content: String) async throws -> Note {
-        let urlString = "\(baseURL)/api/notes/\(id)"
+        let urlString = "\(effectiveBaseURL)/api/notes/\(id)"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }
@@ -189,7 +255,7 @@ class NetworkService {
     }
     
     func deleteNote(id: Int) async throws {
-        let urlString = "\(baseURL)/api/notes/\(id)"
+        let urlString = "\(effectiveBaseURL)/api/notes/\(id)"
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
         }

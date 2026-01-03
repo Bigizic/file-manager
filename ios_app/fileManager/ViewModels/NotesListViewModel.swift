@@ -36,7 +36,7 @@ class NotesListViewModel: ObservableObject {
         Task {
             do {
                 try await networkService.deleteNote(id: note.id)
-                await loadNotes()
+                loadNotes()
             } catch {
                 errorMessage = "Failed to delete note: \(error.localizedDescription)"
             }
