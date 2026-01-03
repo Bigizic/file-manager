@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Required - File Explorer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="window" style="max-width: 500px; margin-top: 100px;">
+        <!-- Title Bar -->
+        <div class="title-bar">
+            <div class="title-bar-text">Authentication Required</div>
+            <div class="title-bar-controls">
+                <button aria-label="Minimize"></button>
+                <button aria-label="Maximize"></button>
+                <button aria-label="Close" onclick="window.location.href='/'">×</button>
+            </div>
+        </div>
+
+        <!-- Login Form -->
+        <div class="modal-body" style="padding: 30px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">🔒</div>
+                <div style="font-size: 14px; font-weight: bold; color: #000080; margin-bottom: 5px;">
+                    Authenticator Guard
+                </div>
+                <div style="font-size: 11px; color: #606060;">
+                    {% if use_passkey %}
+                        {% if has_users %}
+                            Please enter your passkey to continue
+                        {% else %}
+                            No users found. Please create an account.
+                        {% endif %}
+                    {% else %}
+                        Please enter the password to continue
+                    {% endif %}
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="error-message" style="margin-bottom: 20px;">
+                            ⚠️ {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% if use_passkey and not has_users %}
+                <div style="text-align: center; padding: 20px;">
+                    <p style="margin-bottom: 20px; color: #606060;">No users with passkey found. Please create the first account.</p>
+                    <a href="{{ url_for('sso_signup') }}" class="button-primary">Create SSO Account</a>
+                </div>
+            {% else %}
+                <form method="POST" action="{{ url_for('authenticate') }}" id="login-form">
+                    <input type="hidden" name="next" value="{{ next_url }}">
+                    
+                    {% if use_passkey %}
+                        <div class="form-group">
+                            <label for="username" class="form-label">Username:</label>
+                            <input type="text" 
+                                   id="username" 
+                                   name="username" 
+                                   class="form-input" 
+                                   placeholder="Enter username..."
+                                   autofocus
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="passkey" class="form-label">Passkey:</label>
+                            <input type="password" 
+                                   id="passkey" 
+                                   name="passkey" 
+                                   class="form-input" 
+                                   placeholder="Enter passkey..."
+                                   required>
+                        </div>
+                    {% else %}
+                        <div class="form-group">
+                            <label for="password" class="form-label">Password:</label>
+                            <input type="password" 
+                                   id="password" 
+                                   name="password" 
+                                   class="form-input" 
+                                   placeholder="Enter password..."
+                                   autofocus
+                                   required>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="button-primary">Login</button>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Submit form on Enter key
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            const passwordInput = document.getElementById('password');
+            const passkeyInput = document.getElementById('passkey');
+            const usernameInput = document.getElementById('username');
+            
+            const inputToWatch = passkeyInput || passwordInput;
+            if (inputToWatch) {
+                inputToWatch.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        loginForm.submit();
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
+
