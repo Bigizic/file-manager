@@ -28,9 +28,9 @@
 		AA000025 /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000026 /* NetworkService.swift */; };
 		AA000027 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000028 /* ThemeManager.swift */; };
 		AA000029 /* ThemeExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00002A /* ThemeExtensions.swift */; };
-		AA00002E /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00002F /* ServerSettings.swift */; };
-		AA000030 /* ServerConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000031 /* ServerConnectionViewModel.swift */; };
-		AA000032 /* ServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000033 /* ServerConnectionView.swift */; };
+		AA000052 /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000051 /* ServerSettings.swift */; };
+		AA000053 /* ServerConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000054 /* ServerConnectionViewModel.swift */; };
+		AA000055 /* ServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000050 /* ServerConnectionView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,9 +56,9 @@
 		AA000028 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		AA00002A /* ThemeExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeExtensions.swift; sourceTree = "<group>"; };
 		AA00002B /* fileManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fileManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA00002F /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
-		AA000031 /* ServerConnectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionViewModel.swift; sourceTree = "<group>"; };
-		AA000033 /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
+		AA000051 /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
+		AA000054 /* ServerConnectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionViewModel.swift; sourceTree = "<group>"; };
+		AA000050 /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
 		AA00002C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA00002D /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -124,7 +124,7 @@
 				AA00000C /* FileItem.swift */,
 				AA00000E /* Note.swift */,
 				AA000010 /* Theme.swift */,
-				AA00002F /* ServerSettings.swift */,
+				AA000051 /* ServerSettings.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -143,7 +143,7 @@
 		AA000034A /* ServerConnection */ = {
 			isa = PBXGroup;
 			children = (
-				AA000033 /* ServerConnectionView.swift */,
+				AA000050 /* ServerConnectionView.swift */,
 			);
 			path = ServerConnection;
 			sourceTree = "<group>";
@@ -155,7 +155,7 @@
 				AA000020 /* NotesListViewModel.swift */,
 				AA000022 /* NoteDetailViewModel.swift */,
 				AA000024 /* NoteEditViewModel.swift */,
-				AA000031 /* ServerConnectionViewModel.swift */,
+				AA000054 /* ServerConnectionViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -303,9 +303,9 @@
 				AA000025 /* NetworkService.swift in Sources */,
 				AA000027 /* ThemeManager.swift in Sources */,
 				AA000029 /* ThemeExtensions.swift in Sources */,
-				AA00002E /* ServerSettings.swift in Sources */,
-				AA000030 /* ServerConnectionViewModel.swift in Sources */,
-				AA000032 /* ServerConnectionView.swift in Sources */,
+				AA000052 /* ServerSettings.swift in Sources */,
+				AA000053 /* ServerConnectionViewModel.swift in Sources */,
+				AA000055 /* ServerConnectionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
