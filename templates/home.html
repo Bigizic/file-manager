@@ -24,6 +24,25 @@
             <div class="home-title">Welcome to File Explorer</div>
             <div class="home-subtitle">Choose an option to get started</div>
             
+            <!-- Theme Selector -->
+            <div class="theme-selector-container">
+                <div class="theme-selector-label">Theme:</div>
+                <div class="theme-buttons">
+                    <button class="theme-btn" onclick="setTheme('retro')" id="theme-btn-retro" title="Retro (Default)">
+                        <span class="theme-check" id="theme-retro-check-home">✓</span> Retro
+                    </button>
+                    <button class="theme-btn" onclick="setTheme('robotic')" id="theme-btn-robotic" title="Robotic">
+                        <span class="theme-check" id="theme-robotic-check-home"></span> Robotic
+                    </button>
+                    <button class="theme-btn" onclick="setTheme('cyberpunk')" id="theme-btn-cyberpunk" title="Cyberpunk">
+                        <span class="theme-check" id="theme-cyberpunk-check-home"></span> Cyberpunk
+                    </button>
+                    <button class="theme-btn" onclick="setTheme('saas')" id="theme-btn-saas" title="Modern SaaS">
+                        <span class="theme-check" id="theme-saas-check-home"></span> Modern SaaS
+                    </button>
+                </div>
+            </div>
+            
             <div class="home-buttons">
                 <a href="{{ url_for('explorer') }}" class="home-button file-explorer-btn">
                     <div class="home-button-icon">📁</div>
@@ -52,6 +71,21 @@
                 document.body.classList.add('theme-' + theme);
             }
             localStorage.setItem('fileExplorerTheme', theme);
+            updateThemeCheckmarks(theme);
+        }
+        
+        function updateThemeCheckmarks(selectedTheme) {
+            const themes = ['retro', 'robotic', 'cyberpunk', 'saas'];
+            themes.forEach(theme => {
+                const checkElement = document.getElementById('theme-' + theme + '-check-home');
+                if (checkElement) {
+                    if (theme === selectedTheme) {
+                        checkElement.textContent = '✓';
+                    } else {
+                        checkElement.textContent = '';
+                    }
+                }
+            });
         }
         
         // Load saved theme on page load
