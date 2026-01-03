@@ -1,0 +1,17 @@
+// Configuration file for fileManager iOS App
+// Connection string for the backend server
+// Change this to point to your server URL
+
+BACKEND_BASE_URL = http://localhost:5000
+BACKEND_API_VERSION = v1
+
+// App Configuration
+APP_NAME = fileManager
+APP_BUNDLE_ID = com.filemanager.app
+APP_VERSION = 1.0.0
+APP_BUILD = 1
+
+// Development Configuration
+DEBUG = YES
+ENABLE_LOGGING = YES
+
