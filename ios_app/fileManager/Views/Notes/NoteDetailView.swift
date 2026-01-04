@@ -72,10 +72,19 @@ struct NoteDetailView: View {
                             Divider()
                                 .background(theme.borderColor)
                             
-                            Text(note.content)
-                                .font(.system(size: 16))
-                                .foregroundColor(theme.textColor)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(note.content)
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.black)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(theme.borderColor.opacity(0.2), lineWidth: 1)
+                            )
                             
                             HStack {
                                 Text("Updated: \(formatDate(note.updatedAt))")
