@@ -389,7 +389,12 @@ def explorer(subpath=''):
     """
     Browse a directory. Shows files and folders.
     Security: Validates path to prevent directory traversal.
+    Supports json=true query parameter for JSON response.
+    Example: /explorer?json=true or /explorer/path?json=true
     """
+    # Check if JSON response is requested
+    json_response = request.args.get('json', 'false').lower() == 'true'
+    
     # Decode the path
     if subpath:
         # Remove leading slash if present
@@ -405,15 +410,21 @@ def explorer(subpath=''):
     
     # Security check: ensure path is within allowed root
     if not is_safe_path(ROOT_DIRECTORY, full_path):
+        if json_response:
+            return jsonify({'error': 'Forbidden'}), 403
         abort(403)  # Forbidden
     
     # Check if path exists
     if not os.path.exists(full_path):
+        if json_response:
+            return jsonify({'error': 'Not found'}), 404
         abort(404)  # Not found
     
     # Check if it's a directory
     if not os.path.isdir(full_path):
         # If it's a file, redirect to download
+        if json_response:
+            return jsonify({'error': 'Path is not a directory'}), 400
         return download(subpath)
     
     # Get directory contents
@@ -426,7 +437,7 @@ def explorer(subpath=''):
             # Skip hidden files/folders (optional - remove if you want to show them)
             if entry.startswith('.'):
                 continue
-            
+
             item_info = get_file_info(entry_path)
             # Calculate relative path from root for navigation
             if subpath:
@@ -448,6 +459,35 @@ def explorer(subpath=''):
                         'path': current_path.replace('\\', '/')  # Use forward slashes for URLs
                     })
         
+        # Return JSON if requested
+        if json_response:
+            # Format items for JSON response to match iOS app expectations
+            formatted_items = []
+            for item in items:
+                # Ensure relative_path exists (it should be added above)
+                relative_path = item.get('relative_path', '')
+                if not relative_path:
+                    # Fallback: use name if relative_path is missing
+                    relative_path = item.get('name', '')
+                
+                formatted_item = {
+                    'name': item.get('name', ''),
+                    'relative_path': relative_path,
+                    'is_dir': item.get('is_dir', False),
+                    'size': item.get('size', '-'),
+                    'modified': item.get('modified', ''),
+                    'is_image': item.get('is_image', False),
+                    'is_video': item.get('is_video', False),
+                    'is_media': item.get('is_media', False)
+                }
+                formatted_items.append(formatted_item)
+            
+            return jsonify({
+                'items': formatted_items,
+                'current_path': subpath or '',
+                'breadcrumbs': breadcrumbs or []
+            })
+        
         return render_template('index.html', 
                              items=items, 
                              current_path=subpath,
@@ -455,8 +495,12 @@ def explorer(subpath=''):
                              root_dir=ROOT_DIRECTORY)
     
     except PermissionError:
+        if json_response:
+            return jsonify({'error': 'Permission denied'}), 403
         abort(403)  # Forbidden - no permission to read directory
     except Exception as e:
+        if json_response:
+            return jsonify({'error': str(e)}), 500
         abort(500)  # Internal server error
 
 
@@ -1161,14 +1205,252 @@ def internal_error(error):
                          error_message="Internal Server Error"), 500
 
 
+# ==================== API ENDPOINTS ====================
+
+@app.route('/api/info')
+@require_auth
+def api_info():
+    """
+    Get server information.
+    Returns JSON with server name, version, and features.
+    Example: /api/info
+    """
+    return jsonify({
+        'name': 'File Explorer Server',
+        'version': '1.0.0',
+        'features': ['file_explorer', 'notes', 'authentication']
+    })
+
+
+@app.route('/api/notes', methods=['GET', 'POST'])
+@require_auth
+def api_notes():
+    """
+    Get all notes (GET) or create a new note (POST).
+    Returns JSON response.
+    Example: GET /api/notes, POST /api/notes
+    """
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    if request.method == 'GET':
+        try:
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM notes ORDER BY updated_at DESC")
+            notes = cursor.fetchall()
+            cursor.close()
+            connection.close()
+            
+            # Format notes for JSON response
+            formatted_notes = []
+            for note in notes:
+                # Ensure dates are always strings, never None
+                created_at = ''
+                updated_at = ''
+                if note.get('created_at'):
+                    created_at = note['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                if note.get('updated_at'):
+                    updated_at = note['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                
+                formatted_note = {
+                    'id': note.get('id', 0),
+                    'title': note.get('title', ''),
+                    'content': note.get('content', ''),
+                    'created_at': created_at,
+                    'updated_at': updated_at
+                }
+                formatted_notes.append(formatted_note)
+            
+            return jsonify({'notes': formatted_notes})
+        except Error as e:
+            if connection:
+                connection.close()
+            return jsonify({'error': f"Error fetching notes: {str(e)}"}), 500
+    
+    elif request.method == 'POST':
+        try:
+            # Get JSON data from request
+            if request.is_json:
+                data = request.get_json()
+                title = data.get('title', '').strip()
+                content = data.get('content', '').strip()
+            else:
+                # Fallback to form data
+                title = request.form.get('title', '').strip()
+                content = request.form.get('content', '').strip()
+            
+            if not title:
+                return jsonify({'error': 'Title is required'}), 400
+            
+            cursor = connection.cursor()
+            cursor.execute(
+                "INSERT INTO notes (title, content) VALUES (%s, %s)",
+                (title, content)
+            )
+            connection.commit()
+            note_id = cursor.lastrowid
+            cursor.close()
+            
+            # Fetch the created note
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+            note = cursor.fetchone()
+            cursor.close()
+            connection.close()
+            
+            # Ensure dates are always strings, never None
+            created_at = ''
+            updated_at = ''
+            if note.get('created_at'):
+                created_at = note['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            if note.get('updated_at'):
+                updated_at = note['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            formatted_note = {
+                'id': note.get('id', 0),
+                'title': note.get('title', ''),
+                'content': note.get('content', ''),
+                'created_at': created_at,
+                'updated_at': updated_at
+            }
+            
+            return jsonify({'note': formatted_note}), 201
+        except Error as e:
+            if connection:
+                connection.close()
+            return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notes/<int:note_id>', methods=['GET', 'PUT', 'DELETE'])
+@require_auth
+def api_note_detail(note_id):
+    """
+    Get (GET), update (PUT), or delete (DELETE) a specific note.
+    Returns JSON response.
+    Example: GET /api/notes/1, PUT /api/notes/1, DELETE /api/notes/1
+    """
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    if request.method == 'GET':
+        try:
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+            note = cursor.fetchone()
+            cursor.close()
+            connection.close()
+            
+            if not note:
+                return jsonify({'error': 'Note not found'}), 404
+            
+            # Ensure dates are always strings, never None
+            created_at = ''
+            updated_at = ''
+            if note.get('created_at'):
+                created_at = note['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            if note.get('updated_at'):
+                updated_at = note['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            formatted_note = {
+                'id': note.get('id', 0),
+                'title': note.get('title', ''),
+                'content': note.get('content', ''),
+                'created_at': created_at,
+                'updated_at': updated_at
+            }
+            return jsonify({'note': formatted_note})
+        except Error as e:
+            if connection:
+                connection.close()
+            return jsonify({'error': f"Error fetching note: {str(e)}"}), 500
+    
+    elif request.method == 'PUT':
+        try:
+            # Get JSON data from request
+            if request.is_json:
+                data = request.get_json()
+                title = data.get('title', '').strip()
+                content = data.get('content', '').strip()
+            else:
+                # Fallback to form data
+                title = request.form.get('title', '').strip()
+                content = request.form.get('content', '').strip()
+            
+            if not title:
+                return jsonify({'error': 'Title is required'}), 400
+            
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE notes SET title = %s, content = %s WHERE id = %s",
+                (title, content, note_id)
+            )
+            connection.commit()
+            cursor.close()
+            
+            # Fetch the updated note
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+            note = cursor.fetchone()
+            cursor.close()
+            connection.close()
+            
+            if not note:
+                return jsonify({'error': 'Note not found'}), 404
+            
+            # Ensure dates are always strings, never None
+            created_at = ''
+            updated_at = ''
+            if note.get('created_at'):
+                created_at = note['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            if note.get('updated_at'):
+                updated_at = note['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            formatted_note = {
+                'id': note.get('id', 0),
+                'title': note.get('title', ''),
+                'content': note.get('content', ''),
+                'created_at': created_at,
+                'updated_at': updated_at
+            }
+            return jsonify({'note': formatted_note})
+        except Error as e:
+            if connection:
+                connection.close()
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'DELETE':
+        try:
+            cursor = connection.cursor()
+            cursor.execute("DELETE FROM notes WHERE id = %s", (note_id,))
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return jsonify({'success': True, 'message': 'Note deleted successfully'}), 200
+        except Error as e:
+            if connection:
+                connection.close()
+            return jsonify({'error': str(e)}), 500
+
+
 # ==================== NOTES ROUTES ====================
 
 @app.route('/notes')
 @require_auth
 def notes_list():
-    """Display all notes."""
+    """
+    Display all notes.
+    Supports json=true query parameter for JSON response.
+    Example: /notes?json=true
+    """
+    # Check if JSON response is requested
+    json_response = request.args.get('json', 'false').lower() == 'true'
+    
     connection = get_db_connection()
     if not connection:
+        if json_response:
+            return jsonify({'error': 'Database connection failed'}), 500
         return render_template('notes.html', notes=[], error="Database connection failed")
     
     try:
@@ -1177,10 +1459,35 @@ def notes_list():
         notes = cursor.fetchall()
         cursor.close()
         connection.close()
+        
+        if json_response:
+            # Format notes for JSON response (convert datetime to strings)
+            formatted_notes = []
+            for note in notes:
+                # Ensure dates are always strings, never None
+                created_at = ''
+                updated_at = ''
+                if note.get('created_at'):
+                    created_at = note['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                if note.get('updated_at'):
+                    updated_at = note['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                
+                formatted_note = {
+                    'id': note.get('id', 0),
+                    'title': note.get('title', ''),
+                    'content': note.get('content', ''),
+                    'created_at': created_at,
+                    'updated_at': updated_at
+                }
+                formatted_notes.append(formatted_note)
+            return jsonify({'notes': formatted_notes})
+        
         return render_template('notes.html', notes=notes, error=None)
     except Error as e:
         if connection:
             connection.close()
+        if json_response:
+            return jsonify({'error': f"Error fetching notes: {str(e)}"}), 500
         return render_template('notes.html', notes=[], error=f"Error fetching notes: {str(e)}")
 
 
@@ -1218,9 +1525,18 @@ def create_note():
 @app.route('/notes/<int:note_id>')
 @require_auth
 def view_note(note_id):
-    """View a note (read-only)."""
+    """
+    View a note (read-only).
+    Supports json=true query parameter for JSON response.
+    Example: /notes/1?json=true
+    """
+    # Check if JSON response is requested
+    json_response = request.args.get('json', 'false').lower() == 'true'
+    
     connection = get_db_connection()
     if not connection:
+        if json_response:
+            return jsonify({'error': 'Database connection failed'}), 500
         return render_template('error.html', 
                              error_code=500, 
                              error_message="Database connection failed"), 500
@@ -1233,12 +1549,34 @@ def view_note(note_id):
         connection.close()
         
         if not note:
+            if json_response:
+                return jsonify({'error': 'Note not found'}), 404
             abort(404)
+        
+        if json_response:
+            # Ensure dates are always strings, never None
+            created_at = ''
+            updated_at = ''
+            if note.get('created_at'):
+                created_at = note['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            if note.get('updated_at'):
+                updated_at = note['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            formatted_note = {
+                'id': note.get('id', 0),
+                'title': note.get('title', ''),
+                'content': note.get('content', ''),
+                'created_at': created_at,
+                'updated_at': updated_at
+            }
+            return jsonify({'note': formatted_note})
         
         return render_template('note_view.html', note=note)
     except Error as e:
         if connection:
             connection.close()
+        if json_response:
+            return jsonify({'error': f"Error fetching note: {str(e)}"}), 500
         return render_template('error.html', 
                              error_code=500, 
                              error_message=f"Error fetching note: {str(e)}"), 500
