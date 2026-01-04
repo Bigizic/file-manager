@@ -15,11 +15,24 @@ class ServerConnectionViewModel: ObservableObject {
     @Published var currentServer: ServerSettings?
     @Published var connectionStatus: ConnectionStatus = .disconnected
     
-    enum ConnectionStatus {
+    enum ConnectionStatus: Equatable {
         case disconnected
         case connecting
         case connected
         case error(String)
+        
+        static func == (lhs: ConnectionStatus, rhs: ConnectionStatus) -> Bool {
+            switch (lhs, rhs) {
+            case (.disconnected, .disconnected),
+                 (.connecting, .connecting),
+                 (.connected, .connected):
+                return true
+            case (.error(let lhsError), .error(let rhsError)):
+                return lhsError == rhsError
+            default:
+                return false
+            }
+        }
     }
     
     private let networkService = NetworkService.shared
@@ -30,13 +43,35 @@ class ServerConnectionViewModel: ObservableObject {
     }
     
     func loadSavedServer() {
-        if let data = UserDefaults.standard.data(forKey: serverSettingsKey),
-           let server = try? JSONDecoder().decode(ServerSettings.self, from: data) {
+        guard let data = UserDefaults.standard.data(forKey: serverSettingsKey) else {
+            return
+        }
+        
+        let decoder = JSONDecoder()
+        // Try secondsSince1970 first (default), then fallback to iso8601
+        decoder.dateDecodingStrategy = .secondsSince1970
+        
+        do {
+            let server = try decoder.decode(ServerSettings.self, from: data)
             self.currentServer = server
             if server.isConnected {
                 self.connectionStatus = .connected
                 // Update NetworkService with saved URL
                 NetworkService.shared.setBaseURL(server.serverURL)
+            }
+        } catch {
+            // Try with iso8601 format as fallback
+            decoder.dateDecodingStrategy = .iso8601
+            if let server = try? decoder.decode(ServerSettings.self, from: data) {
+                self.currentServer = server
+                if server.isConnected {
+                    self.connectionStatus = .connected
+                    NetworkService.shared.setBaseURL(server.serverURL)
+                }
+            } else {
+                // If both fail, clear the corrupted data
+                print("Failed to decode saved server settings: \(error.localizedDescription)")
+                UserDefaults.standard.removeObject(forKey: serverSettingsKey)
             }
         }
     }
@@ -66,7 +101,9 @@ class ServerConnectionViewModel: ObservableObject {
                 )
                 
                 // Save to UserDefaults
-                if let encoded = try? JSONEncoder().encode(server) {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .secondsSince1970
+                if let encoded = try? encoder.encode(server) {
                     UserDefaults.standard.set(encoded, forKey: serverSettingsKey)
                 }
                 

@@ -40,7 +40,7 @@ struct ServerConnectionView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(themeManager.currentTheme.textColor)
                     
-                    TextField("http://192.168.1.120:5000", text: $serverURL)
+                    TextField("", text: $serverURL, prompt: Text("").foregroundColor(themeManager.currentTheme.textColor.opacity(0.3)))
                         .textFieldStyle(ThemedTextFieldStyle(theme: themeManager.currentTheme))
                         .autocapitalization(.none)
                         .disableAutocorrection(true)

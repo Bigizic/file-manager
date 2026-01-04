@@ -63,6 +63,12 @@ struct FileListResponse: Codable {
     let items: [FileItem]
     let currentPath: String
     let breadcrumbs: [Breadcrumb]
+    
+    enum CodingKeys: String, CodingKey {
+        case items
+        case currentPath = "current_path"
+        case breadcrumbs
+    }
 }
 
 struct Breadcrumb: Codable, Identifiable {

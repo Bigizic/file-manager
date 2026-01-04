@@ -122,6 +122,8 @@ class NetworkService {
         if !path.isEmpty {
             urlString += "/\(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path)"
         }
+        // Add json=true query parameter for JSON response
+        urlString += "?json=true"
         
         guard let url = URL(string: urlString) else {
             throw NetworkError.invalidURL
@@ -137,15 +139,11 @@ class NetworkService {
             throw NetworkError.httpError(httpResponse.statusCode)
         }
         
-        // Parse HTML response to extract file list
-        // For now, we'll need to parse the HTML or use a JSON endpoint if available
-        // This is a simplified version - you may need to adjust based on your backend
-        
+        // Parse JSON response
         let decoder = JSONDecoder()
         do {
             return try decoder.decode(FileListResponse.self, from: data)
         } catch {
-            // If JSON parsing fails, try HTML parsing
             throw NetworkError.decodingError(error)
         }
     }
