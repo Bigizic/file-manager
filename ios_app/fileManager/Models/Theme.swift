@@ -50,7 +50,7 @@ struct Theme: Identifiable {
         borderColor: Color(hex: "#808080"),
         cardBackgroundColor: Color(hex: "#f0f0f0"),
         cardBorderColor: Color(hex: "#c0c0c0"),
-        colorScheme: nil,
+        colorScheme: .dark, // user request: retro defaults to dark mode
         font: .system(size: 14, design: .default)
     )
     

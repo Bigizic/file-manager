@@ -9,6 +9,7 @@ import SwiftUI
 
 struct NotesListView: View {
     @EnvironmentObject var themeManager: ThemeManager
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel = NotesListViewModel()
     @State private var showCreateNote = false
     @State private var selectedNote: Note?
@@ -36,7 +37,7 @@ struct NotesListView: View {
                             NoteCardView(note: note, theme: themeManager.currentTheme) {
                                 selectedNote = note
                             }
-                            .listRowBackground(themeManager.currentTheme.cardBackgroundColor)
+                            .listRowBackground(Color.clear) // remove white container
                             .listRowSeparator(.hidden)
                         }
                         .onDelete { indexSet in
@@ -50,8 +51,9 @@ struct NotesListView: View {
                     .background(themeManager.currentTheme.backgroundColor)
                 }
             }
-            .navigationTitle("Notes")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("") // remove visible title
+            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden) // no default list background
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
@@ -83,18 +85,20 @@ struct NotesListView: View {
     }
     
     private var toolbarIconColor: Color {
-        switch themeManager.currentTheme.id {
-        case .retro:
-            return .black
-        case .saas:
-            return themeManager.currentTheme.accentColor
-        default:
-            return themeManager.currentTheme.accentColor
+        if themeManager.currentTheme.id == .retro {
+            return colorScheme == .dark ? .white : .black
         }
+        return themeManager.currentTheme.accentColor
     }
     
     private var toolbarGlassBackground: some View {
-        Color.clear.background(.ultraThinMaterial)
+        let base: Color
+        if themeManager.currentTheme.id == .retro {
+            base = colorScheme == .dark ? .black.opacity(0.8) : .white.opacity(0.8)
+        } else {
+            base = .clear
+        }
+        return base.background(.ultraThinMaterial)
     }
 }
 
@@ -132,7 +136,7 @@ struct NoteCardView: View {
                 }
             }
             .padding()
-            .background(theme.cardBackgroundColor)
+            .background(noteCardBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(theme.cardBorderColor, lineWidth: 1)
@@ -146,6 +150,10 @@ struct NoteCardView: View {
     private func formatDate(_ dateString: String) -> String {
         // Simple date formatting - you might want to use DateFormatter for better formatting
         return dateString
+    }
+    
+    private var noteCardBackground: Color {
+        theme.id == .retro ? Color.clear : theme.cardBackgroundColor
     }
 }
 

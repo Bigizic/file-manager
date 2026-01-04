@@ -92,18 +92,20 @@ struct HomeView: View {
     }
     
     private var homeToolbarIconColor: Color {
-        switch themeManager.currentTheme.id {
-        case .retro:
-            return .black
-        case .saas:
-            return themeManager.currentTheme.accentColor
-        default:
-            return themeManager.currentTheme.accentColor
+        if themeManager.currentTheme.id == .retro {
+            return themeManager.currentTheme.colorScheme == .dark ? .white : .black
         }
+        return themeManager.currentTheme.accentColor
     }
     
     private var homeToolbarGlassBackground: some View {
-        Color.clear.background(.ultraThinMaterial)
+        let base: Color
+        if themeManager.currentTheme.id == .retro {
+            base = (themeManager.currentTheme.colorScheme == .dark) ? .black.opacity(0.8) : .white.opacity(0.8)
+        } else {
+            base = .clear
+        }
+        return base.background(.ultraThinMaterial)
     }
 }
 

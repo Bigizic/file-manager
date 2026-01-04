@@ -120,6 +120,7 @@ struct NoteEditView: View {
     
     // MARK: - Theming helpers
     private var isDarkTextArea: Bool {
+        // Retro uses white text areas even in dark; only robotic/cyberpunk stay dark
         theme.id == .robotic || theme.id == .cyberpunk
     }
     
