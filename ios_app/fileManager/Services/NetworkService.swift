@@ -192,14 +192,24 @@ class NetworkService {
         
         let (data, response) = try await session.data(from: url)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
         
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.httpError(httpResponse.statusCode)
+        }
+        
         let decoder = JSONDecoder()
-        let responseData = try decoder.decode(NoteResponse.self, from: data)
-        return responseData.note
+        do {
+            let responseData = try decoder.decode(NoteResponse.self, from: data)
+            return responseData.note
+        } catch {
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Failed to decode note. Response: \(jsonString)")
+            }
+            throw NetworkError.decodingError(error)
+        }
     }
     
     func createNote(title: String, content: String) async throws -> Note {
@@ -217,14 +227,28 @@ class NetworkService {
         
         let (data, response) = try await session.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
         
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            if let errorData = try? JSONDecoder().decode([String: String].self, from: data),
+               let errorMessage = errorData["error"] {
+                throw NetworkError.httpError(httpResponse.statusCode)
+            }
+            throw NetworkError.httpError(httpResponse.statusCode)
+        }
+        
         let decoder = JSONDecoder()
-        let responseData = try decoder.decode(NoteResponse.self, from: data)
-        return responseData.note
+        do {
+            let responseData = try decoder.decode(NoteResponse.self, from: data)
+            return responseData.note
+        } catch {
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Failed to decode created note. Response: \(jsonString)")
+            }
+            throw NetworkError.decodingError(error)
+        }
     }
     
     func updateNote(id: Int, title: String, content: String) async throws -> Note {
@@ -242,14 +266,28 @@ class NetworkService {
         
         let (data, response) = try await session.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
         
+        guard httpResponse.statusCode == 200 else {
+            if let errorData = try? JSONDecoder().decode([String: String].self, from: data),
+               let errorMessage = errorData["error"] {
+                throw NetworkError.httpError(httpResponse.statusCode)
+            }
+            throw NetworkError.httpError(httpResponse.statusCode)
+        }
+        
         let decoder = JSONDecoder()
-        let responseData = try decoder.decode(NoteResponse.self, from: data)
-        return responseData.note
+        do {
+            let responseData = try decoder.decode(NoteResponse.self, from: data)
+            return responseData.note
+        } catch {
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Failed to decode updated note. Response: \(jsonString)")
+            }
+            throw NetworkError.decodingError(error)
+        }
     }
     
     func deleteNote(id: Int) async throws {
