@@ -130,13 +130,18 @@ struct HomeButton: View {
 struct ThemeSelectorView: View {
     @EnvironmentObject var themeManager: ThemeManager
     
+    private let columns = [
+        GridItem(.adaptive(minimum: 100), spacing: 12)
+    ]
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Theme:")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(themeManager.currentTheme.textColor)
             
-            HStack(spacing: 12) {
+            // Use LazyVGrid for responsive layout that wraps to multiple rows
+            LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(ThemeType.allCases, id: \.self) { themeType in
                     ThemeButton(
                         themeType: themeType,
@@ -178,10 +183,13 @@ struct ThemeButton: View {
                 
                 Text(themeType.displayName)
                     .font(.system(size: 12))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundColor(isSelected ? theme.textColor : theme.textColor.opacity(0.7))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
             .background(isSelected ? theme.accentColor.opacity(0.2) : Color.clear)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
