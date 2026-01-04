@@ -73,7 +73,10 @@ struct HomeView: View {
                         showServerConnection = true
                     }) {
                         Image(systemName: "plus")
-                            .foregroundColor(themeManager.currentTheme.accentColor)
+                            .foregroundColor(homeToolbarIconColor)
+                            .padding(8)
+                            .background(homeToolbarGlassBackground)
+                            .clipShape(Circle())
                     }
                 }
             }
@@ -86,6 +89,21 @@ struct HomeView: View {
             }
         }
         .applyTheme(themeManager.currentTheme)
+    }
+    
+    private var homeToolbarIconColor: Color {
+        switch themeManager.currentTheme.id {
+        case .retro:
+            return .black
+        case .saas:
+            return themeManager.currentTheme.accentColor
+        default:
+            return themeManager.currentTheme.accentColor
+        }
+    }
+    
+    private var homeToolbarGlassBackground: some View {
+        Color.clear.background(.ultraThinMaterial)
     }
 }
 

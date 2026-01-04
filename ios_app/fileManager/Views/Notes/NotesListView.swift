@@ -58,7 +58,10 @@ struct NotesListView: View {
                         showCreateNote = true
                     }) {
                         Image(systemName: "plus")
-                            .foregroundColor(themeManager.currentTheme.accentColor)
+                            .foregroundColor(toolbarIconColor)
+                            .padding(8)
+                            .background(toolbarGlassBackground)
+                            .clipShape(Circle())
                     }
                 }
             }
@@ -77,6 +80,21 @@ struct NotesListView: View {
             }
         }
         .applyTheme(themeManager.currentTheme)
+    }
+    
+    private var toolbarIconColor: Color {
+        switch themeManager.currentTheme.id {
+        case .retro:
+            return .black
+        case .saas:
+            return themeManager.currentTheme.accentColor
+        default:
+            return themeManager.currentTheme.accentColor
+        }
+    }
+    
+    private var toolbarGlassBackground: some View {
+        Color.clear.background(.ultraThinMaterial)
     }
 }
 

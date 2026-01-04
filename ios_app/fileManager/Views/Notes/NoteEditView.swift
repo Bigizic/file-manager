@@ -35,7 +35,14 @@ struct NoteEditView: View {
                             .foregroundColor(theme.textColor)
                         
                         TextField("Enter note title", text: $title)
-                            .textFieldStyle(ThemedTextFieldStyle(theme: theme))
+                            .padding()
+                            .background(textFieldBackground)
+                            .foregroundColor(textFieldTextColor)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(theme.borderColor, lineWidth: 1)
+                            )
+                            .cornerRadius(8)
                     }
                     
                     VStack(alignment: .leading, spacing: 12) {
@@ -46,7 +53,8 @@ struct NoteEditView: View {
                         TextEditor(text: $content)
                             .frame(minHeight: 300)
                             .padding(8)
-                            .background(theme.surfaceColor)
+                            .background(textFieldBackground)
+                            .foregroundColor(textFieldTextColor)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(theme.borderColor, lineWidth: 1)
@@ -64,14 +72,22 @@ struct NoteEditView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(theme.textColor)
+                    .foregroundColor(toolbarForegroundColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(toolbarGlassBackground)
+                    .clipShape(Capsule())
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         saveNote()
                     }
-                    .foregroundColor(theme.accentColor)
+                    .foregroundColor(toolbarForegroundColorAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(toolbarGlassBackground)
+                    .clipShape(Capsule())
                     .disabled(title.isEmpty)
                 }
             }
@@ -99,6 +115,45 @@ struct NoteEditView: View {
             } catch {
                 // Handle error
             }
+        }
+    }
+    
+    // MARK: - Theming helpers
+    private var isDarkTextArea: Bool {
+        theme.id == .robotic || theme.id == .cyberpunk
+    }
+    
+    private var textFieldBackground: Color {
+        isDarkTextArea ? theme.surfaceColor : .white
+    }
+    
+    private var textFieldTextColor: Color {
+        isDarkTextArea ? theme.textColor : .black
+    }
+    
+    private var toolbarGlassBackground: some View {
+        Color.clear.background(.ultraThinMaterial)
+    }
+    
+    private var toolbarForegroundColor: Color {
+        switch theme.id {
+        case .retro:
+            return .black
+        case .saas:
+            return theme.textColor
+        default:
+            return theme.textColor
+        }
+    }
+    
+    private var toolbarForegroundColorAccent: Color {
+        switch theme.id {
+        case .retro:
+            return .black
+        case .saas:
+            return theme.accentColor
+        default:
+            return theme.accentColor
         }
     }
 }

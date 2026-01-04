@@ -12,6 +12,7 @@ extension View {
         self
             .foregroundColor(theme.textColor)
             .background(theme.backgroundColor)
+            .preferredColorScheme(theme.colorScheme)
     }
 }
 
