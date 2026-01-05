@@ -31,6 +31,7 @@ struct FileExplorerView: View {
     @State private var fileToShowInfo: FileItem?
     @State private var showFileInfo = false
     @State private var showDocumentPicker = false
+    @State private var showFileSavePicker = false
     
     var body: some View {
         NavigationView {
@@ -41,6 +42,17 @@ struct FileExplorerView: View {
                 if viewModel.isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                } else if let successMessage = viewModel.downloadSuccessMessage {
+                    VStack(spacing: 16) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 48))
+                            .foregroundColor(.green)
+                        Text(successMessage)
+                            .font(.system(size: 14))
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                    }
                 } else if let error = viewModel.errorMessage {
                     FileExplorerErrorView(message: error) {
                         viewModel.loadFiles(path: currentPath)

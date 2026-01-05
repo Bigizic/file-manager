@@ -16,6 +16,7 @@ class FileExplorerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var clipboardPath: String?
     @Published var clipboardOperation: String? // "copy" or "cut"
+    @Published var downloadSuccessMessage: String?
     
     private let networkService = NetworkService.shared
     
@@ -225,7 +226,22 @@ class FileExplorerViewModel: ObservableObject {
             
             await MainActor.run {
                 // File saved successfully - show success message
+                let pathDisplay: String
+                if relativePath.isEmpty {
+                    pathDisplay = "FileManager/\(serverName)/\(file.name)"
+                } else {
+                    pathDisplay = "FileManager/\(serverName)/\(relativePath)/\(file.name)"
+                }
+                downloadSuccessMessage = "File saved to Files app:\n\(pathDisplay)"
                 print("File saved successfully to: \(fileURL.path)")
+                
+                // Clear success message after 3 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    await MainActor.run {
+                        downloadSuccessMessage = nil
+                    }
+                }
             }
         } catch {
             await MainActor.run {
