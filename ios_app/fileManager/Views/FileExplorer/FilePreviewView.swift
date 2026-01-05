@@ -10,7 +10,6 @@ import UIKit
 
 struct FilePreviewView: View {
     let file: FileItem
-    let theme: Theme
     
     @Environment(\.dismiss) var dismiss
     @State private var imageData: Data?
@@ -20,21 +19,21 @@ struct FilePreviewView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                theme.backgroundColor
+                Color(UIColor.systemBackground)
                     .ignoresSafeArea()
                 
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: theme.accentColor))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
                 } else if let error = errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 48))
-                            .foregroundColor(theme.accentColor)
+                            .foregroundColor(.accentColor)
                         
                         Text(error)
                             .font(.system(size: 16))
-                            .foregroundColor(theme.textColor)
+                            .foregroundColor(.primary)
                             .multilineTextAlignment(.center)
                     }
                     .padding()
@@ -48,7 +47,7 @@ struct FilePreviewView: View {
                 } else {
                     Text("Preview not available")
                         .font(.system(size: 16))
-                        .foregroundColor(theme.textColor.opacity(0.6))
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle(file.name)
@@ -58,14 +57,13 @@ struct FilePreviewView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(theme.accentColor)
+                    .foregroundColor(.accentColor)
                 }
             }
             .onAppear {
                 loadPreview()
             }
         }
-        .applyTheme(theme)
     }
     
     private func loadPreview() {
@@ -99,8 +97,6 @@ struct FilePreviewView: View {
             isImage: true,
             isVideo: false,
             isMedia: true
-        ),
-        theme: Theme.retro
+        )
     )
 }
-

@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct FileExplorerView: View {
-    @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = FileExplorerViewModel()
     @State private var currentPath: String = ""
@@ -18,14 +17,14 @@ struct FileExplorerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                themeManager.currentTheme.backgroundColor
+                Color(UIColor.systemBackground)
                     .ignoresSafeArea()
                 
                 if viewModel.isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: themeManager.currentTheme.accentColor))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
                 } else if let error = viewModel.errorMessage {
-                    ErrorView(message: error, theme: themeManager.currentTheme) {
+                    FileExplorerErrorView(message: error) {
                         viewModel.loadFiles(path: currentPath)
                     }
                 } else {
@@ -33,8 +32,7 @@ struct FileExplorerView: View {
                         // Breadcrumb Navigation
                         if !viewModel.breadcrumbs.isEmpty {
                             BreadcrumbView(
-                                breadcrumbs: viewModel.breadcrumbs,
-                                theme: themeManager.currentTheme
+                                breadcrumbs: viewModel.breadcrumbs
                             ) { path in
                                 currentPath = path
                                 viewModel.loadFiles(path: path)
@@ -44,23 +42,21 @@ struct FileExplorerView: View {
                         // File List
                         if viewModel.files.isEmpty {
                             EmptyStateView(
-                                message: "No files or folders found",
-                                theme: themeManager.currentTheme
+                                message: "No files or folders found"
                             )
                         } else {
                             List {
                                 ForEach(viewModel.files) { file in
                                     FileRowView(
-                                        file: file,
-                                        theme: themeManager.currentTheme
+                                        file: file
                                     ) {
                                         handleFileTap(file: file)
                                     }
-                                    .listRowBackground(themeManager.currentTheme.surfaceColor)
+                                    .listRowBackground(Color(UIColor.secondarySystemBackground))
                                 }
                             }
                             .listStyle(PlainListStyle())
-                            .background(themeManager.currentTheme.backgroundColor)
+                            .background(Color(UIColor.systemBackground))
                         }
                     }
                 }
@@ -73,7 +69,7 @@ struct FileExplorerView: View {
                         viewModel.loadFiles(path: currentPath)
                     }) {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(themeManager.currentTheme.accentColor)
+                            .foregroundColor(.accentColor)
                     }
                 }
             }
@@ -81,10 +77,9 @@ struct FileExplorerView: View {
                 viewModel.loadFiles(path: currentPath)
             }
             .sheet(item: $selectedFile) { file in
-                FilePreviewView(file: file, theme: themeManager.currentTheme)
+                FilePreviewView(file: file)
             }
         }
-        .applyTheme(themeManager.currentTheme)
     }
     
     private func handleFileTap(file: FileItem) {
@@ -105,7 +100,6 @@ struct FileExplorerView: View {
 
 struct FileRowView: View {
     let file: FileItem
-    let theme: Theme
     let action: () -> Void
     
     var body: some View {
@@ -114,26 +108,26 @@ struct FileRowView: View {
                 // Icon
                 Image(systemName: file.isDirectory ? "folder.fill" : fileIcon(for: file))
                     .font(.system(size: 24))
-                    .foregroundColor(file.isDirectory ? theme.accentColor : theme.textColor.opacity(0.7))
+                    .foregroundColor(file.isDirectory ? .accentColor : .secondary)
                     .frame(width: 32, height: 32)
                 
                 // File Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(file.name)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(theme.textColor)
+                        .foregroundColor(.primary)
                         .lineLimit(1)
                     
                     HStack(spacing: 12) {
                         if !file.isDirectory {
                             Text(file.size)
                                 .font(.system(size: 12))
-                                .foregroundColor(theme.textColor.opacity(0.6))
+                                .foregroundColor(.secondary)
                         }
                         
                         Text(file.modified)
                             .font(.system(size: 12))
-                            .foregroundColor(theme.textColor.opacity(0.6))
+                            .foregroundColor(.secondary)
                     }
                 }
                 
@@ -142,7 +136,7 @@ struct FileRowView: View {
                 if !file.isDirectory {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12))
-                        .foregroundColor(theme.textColor.opacity(0.4))
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(.vertical, 8)
@@ -163,7 +157,6 @@ struct FileRowView: View {
 
 struct BreadcrumbView: View {
     let breadcrumbs: [Breadcrumb]
-    let theme: Theme
     let onTap: (String) -> Void
     
     var body: some View {
@@ -175,60 +168,58 @@ struct BreadcrumbView: View {
                     }) {
                         Text(breadcrumb.name)
                             .font(.system(size: 14))
-                            .foregroundColor(theme.accentColor)
+                            .foregroundColor(.accentColor)
                     }
                     
                     if breadcrumb.id != breadcrumbs.last?.id {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10))
-                            .foregroundColor(theme.textColor.opacity(0.5))
+                            .foregroundColor(.secondary)
                     }
                 }
             }
             .padding(.horizontal)
         }
         .padding(.vertical, 8)
-        .background(theme.surfaceColor)
+        .background(Color(UIColor.secondarySystemBackground))
     }
 }
 
 struct EmptyStateView: View {
     let message: String
-    let theme: Theme
     
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "folder")
                 .font(.system(size: 48))
-                .foregroundColor(theme.textColor.opacity(0.3))
+                .foregroundColor(.secondary)
             
             Text(message)
                 .font(.system(size: 16))
-                .foregroundColor(theme.textColor.opacity(0.6))
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-struct ErrorView: View {
+struct FileExplorerErrorView: View {
     let message: String
-    let theme: Theme
     let retryAction: () -> Void
     
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
-                .foregroundColor(theme.accentColor)
+                .foregroundColor(.accentColor)
             
             Text(message)
                 .font(.system(size: 16))
-                .foregroundColor(theme.textColor)
+                .foregroundColor(.primary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             
             Button("Retry", action: retryAction)
-                .buttonStyle(PrimaryButtonStyle(theme: theme))
+                .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -236,7 +227,5 @@ struct ErrorView: View {
 
 #Preview {
     FileExplorerView()
-        .environmentObject(ThemeManager.shared)
         .environmentObject(AppState.shared)
 }
-

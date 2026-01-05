@@ -9,17 +9,16 @@ import SwiftUI
 
 struct NoteEditView: View {
     let note: Note?
-    let theme: Theme
     let onSave: () -> Void
     
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
     @State private var title: String
     @State private var content: String
     @StateObject private var viewModel = NoteEditViewModel()
     
-    init(note: Note?, theme: Theme, onSave: @escaping () -> Void) {
+    init(note: Note?, onSave: @escaping () -> Void) {
         self.note = note
-        self.theme = theme
         self.onSave = onSave
         _title = State(initialValue: note?.title ?? "")
         _content = State(initialValue: note?.content ?? "")
@@ -32,15 +31,15 @@ struct NoteEditView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Title")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(theme.textColor)
+                            .foregroundColor(.primary)
                         
                         TextField("Enter note title", text: $title)
                             .padding()
-                            .background(textFieldBackground)
-                            .foregroundColor(textFieldTextColor)
+                            .background(Color.white)
+                            .foregroundColor(.black)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(theme.borderColor, lineWidth: 1)
+                                    .stroke(Color(UIColor.separator), lineWidth: 1)
                             )
                             .cornerRadius(8)
                     }
@@ -48,23 +47,23 @@ struct NoteEditView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Content")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(theme.textColor)
+                            .foregroundColor(.primary)
                         
                         TextEditor(text: $content)
                             .frame(minHeight: 300)
                             .padding(8)
-                            .background(textFieldBackground)
-                            .foregroundColor(textFieldTextColor)
+                            .background(Color.white)
+                            .foregroundColor(.black)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(theme.borderColor, lineWidth: 1)
+                                    .stroke(Color(UIColor.separator), lineWidth: 1)
                             )
                             .cornerRadius(8)
                     }
                 }
                 .padding()
             }
-            .background(theme.backgroundColor)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle(note == nil ? "New Note" : "Edit Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -72,10 +71,13 @@ struct NoteEditView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(toolbarForegroundColor)
+                    .foregroundColor(colorScheme == .dark ? .white : .black)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(toolbarGlassBackground)
+                    .background(
+                        (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
+                            .background(.ultraThinMaterial)
+                    )
                     .clipShape(Capsule())
                 }
                 
@@ -83,16 +85,18 @@ struct NoteEditView: View {
                     Button("Save") {
                         saveNote()
                     }
-                    .foregroundColor(toolbarForegroundColorAccent)
+                    .foregroundColor(colorScheme == .dark ? .white : .black)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(toolbarGlassBackground)
+                    .background(
+                        (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
+                            .background(.ultraThinMaterial)
+                    )
                     .clipShape(Capsule())
                     .disabled(title.isEmpty)
                 }
             }
         }
-        .applyTheme(theme)
     }
     
     private func saveNote() {
@@ -117,49 +121,8 @@ struct NoteEditView: View {
             }
         }
     }
-    
-    // MARK: - Theming helpers
-    private var isDarkTextArea: Bool {
-        // Retro uses white text areas even in dark; only robotic/cyberpunk stay dark
-        theme.id == .robotic || theme.id == .cyberpunk
-    }
-    
-    private var textFieldBackground: Color {
-        isDarkTextArea ? theme.surfaceColor : .white
-    }
-    
-    private var textFieldTextColor: Color {
-        isDarkTextArea ? theme.textColor : .black
-    }
-    
-    private var toolbarGlassBackground: some View {
-        Color.clear.background(.ultraThinMaterial)
-    }
-    
-    private var toolbarForegroundColor: Color {
-        switch theme.id {
-        case .retro:
-            return .black
-        case .saas:
-            return theme.textColor
-        default:
-            return theme.textColor
-        }
-    }
-    
-    private var toolbarForegroundColorAccent: Color {
-        switch theme.id {
-        case .retro:
-            return .black
-        case .saas:
-            return theme.accentColor
-        default:
-            return theme.accentColor
-        }
-    }
 }
 
 #Preview {
-    NoteEditView(note: nil, theme: Theme.retro, onSave: {})
+    NoteEditView(note: nil, onSave: {})
 }
-

@@ -9,7 +9,6 @@ import SwiftUI
 
 struct NoteDetailView: View {
     let note: Note
-    let theme: Theme
     let onUpdate: () -> Void
     
     @State private var isEditing = false
@@ -18,9 +17,8 @@ struct NoteDetailView: View {
     @StateObject private var viewModel = NoteDetailViewModel()
     @Environment(\.colorScheme) private var colorScheme
     
-    init(note: Note, theme: Theme, onUpdate: @escaping () -> Void) {
+    init(note: Note, onUpdate: @escaping () -> Void) {
         self.note = note
-        self.theme = theme
         self.onUpdate = onUpdate
         _editedTitle = State(initialValue: note.title)
         _editedContent = State(initialValue: note.content)
@@ -34,15 +32,15 @@ struct NoteDetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Title")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(theme.textColor)
+                                .foregroundColor(.primary)
                             
                             TextField("Title", text: $editedTitle)
                                 .padding()
-                                .background(textFieldBackground)
-                                .foregroundColor(textFieldTextColor)
+                                .background(Color.white)
+                                .foregroundColor(.black)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(theme.borderColor, lineWidth: 1)
+                                        .stroke(Color(UIColor.separator), lineWidth: 1)
                                 )
                                 .cornerRadius(8)
                         }
@@ -50,16 +48,16 @@ struct NoteDetailView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Content")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(theme.textColor)
+                                .foregroundColor(.primary)
                             
                             TextEditor(text: $editedContent)
                                 .frame(minHeight: 300)
                                 .padding(8)
-                                .background(textFieldBackground)
-                                .foregroundColor(textFieldTextColor)
+                                .background(Color.white)
+                                .foregroundColor(.black)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(theme.borderColor, lineWidth: 1)
+                                        .stroke(Color(UIColor.separator), lineWidth: 1)
                                 )
                                 .cornerRadius(8)
                         }
@@ -67,10 +65,10 @@ struct NoteDetailView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Text(note.title)
                                 .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(theme.textColor)
+                                .foregroundColor(.primary)
                             
                             Divider()
-                                .background(theme.borderColor)
+                                .background(Color(UIColor.separator))
                             
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(note.content)
@@ -83,13 +81,13 @@ struct NoteDetailView: View {
                             .cornerRadius(10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(theme.borderColor.opacity(0.2), lineWidth: 1)
+                                    .stroke(Color(UIColor.separator).opacity(0.2), lineWidth: 1)
                             )
                             
                             HStack {
                                 Text("Updated: \(formatDate(note.updatedAt))")
                                     .font(.system(size: 12))
-                                    .foregroundColor(theme.textColor.opacity(0.6))
+                                    .foregroundColor(.secondary)
                                 
                                 Spacer()
                             }
@@ -98,7 +96,7 @@ struct NoteDetailView: View {
                 }
                 .padding()
             }
-            .background(theme.backgroundColor)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle(isEditing ? "Edit Note" : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -107,19 +105,25 @@ struct NoteDetailView: View {
                         Button("Save") {
                             saveNote()
                         }
-                        .foregroundColor(toolbarForegroundColorAccent)
+                        .foregroundColor(colorScheme == .dark ? .white : .black)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(toolbarGlassBackground)
+                        .background(
+                            (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
+                                .background(.ultraThinMaterial)
+                        )
                         .clipShape(Capsule())
                     } else {
                         Button("Edit") {
                             isEditing = true
                         }
-                        .foregroundColor(editButtonForeground)
+                        .foregroundColor(colorScheme == .dark ? .white : .black)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(editButtonBackground)
+                        .background(
+                            (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
+                                .background(.ultraThinMaterial)
+                        )
                         .clipShape(Capsule())
                     }
                 }
@@ -131,16 +135,18 @@ struct NoteDetailView: View {
                             editedTitle = note.title
                             editedContent = note.content
                         }
-                        .foregroundColor(toolbarForegroundColor)
+                        .foregroundColor(colorScheme == .dark ? .white : .black)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(toolbarGlassBackground)
+                        .background(
+                            (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
+                                .background(.ultraThinMaterial)
+                        )
                         .clipShape(Capsule())
                     }
                 }
             }
         }
-        .applyTheme(theme)
     }
     
     private func saveNote() {
@@ -162,60 +168,6 @@ struct NoteDetailView: View {
     private func formatDate(_ dateString: String) -> String {
         return dateString
     }
-    
-    // MARK: - Theming helpers
-    private var isDarkTheme: Bool {
-        theme.colorScheme == .dark
-    }
-    
-    private var textFieldBackground: Color {
-        isDarkTheme ? theme.surfaceColor : .white
-    }
-    
-    private var textFieldTextColor: Color {
-        isDarkTheme ? theme.textColor : .black
-    }
-    
-    private var toolbarGlassBackground: some View {
-        let base: Color
-        if theme.id == .retro {
-            base = isDarkTheme ? .black.opacity(0.8) : .white.opacity(0.8)
-        } else {
-            base = .clear
-        }
-        return base.background(.ultraThinMaterial)
-    }
-    
-    private var toolbarForegroundColor: Color {
-        if theme.id == .retro {
-            return isDarkTheme ? .white : .black
-        }
-        return isDarkTheme ? .white : .black
-    }
-    
-    private var toolbarForegroundColorAccent: Color {
-        if theme.id == .retro {
-            return isDarkTheme ? .white : .black
-        }
-        return isDarkTheme ? .white : .black
-    }
-    
-    private var editButtonForeground: Color {
-        if theme.id == .retro {
-            return isDarkTheme ? .white : .black
-        }
-        return isDarkTheme ? .white : .black
-    }
-    
-    private var editButtonBackground: some View {
-        let base: Color
-        if theme.id == .retro {
-            base = isDarkTheme ? .black.opacity(0.8) : .white.opacity(0.8)
-        } else {
-            base = .clear
-        }
-        return base.background(.ultraThinMaterial)
-    }
 }
 
 #Preview {
@@ -227,8 +179,6 @@ struct NoteDetailView: View {
             createdAt: "2024-01-01",
             updatedAt: "2024-01-01"
         ),
-        theme: Theme.retro,
         onUpdate: {}
     )
 }
-

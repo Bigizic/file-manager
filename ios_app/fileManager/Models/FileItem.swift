@@ -32,16 +32,16 @@ struct FileItem: Identifiable, Codable, Hashable {
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
-        relativePath = try container.decode(String.self, forKey: .relativePath)
-        path = relativePath
-        isDirectory = try container.decode(Bool.self, forKey: .isDirectory)
-        size = try container.decode(String.self, forKey: .size)
-        modified = try container.decode(String.self, forKey: .modified)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        relativePath = try container.decodeIfPresent(String.self, forKey: .relativePath) ?? ""
+        path = relativePath.isEmpty ? name : relativePath
+        isDirectory = try container.decodeIfPresent(Bool.self, forKey: .isDirectory) ?? false
+        size = try container.decodeIfPresent(String.self, forKey: .size) ?? "-"
+        modified = try container.decodeIfPresent(String.self, forKey: .modified) ?? ""
         isImage = try container.decodeIfPresent(Bool.self, forKey: .isImage) ?? false
         isVideo = try container.decodeIfPresent(Bool.self, forKey: .isVideo) ?? false
         isMedia = try container.decodeIfPresent(Bool.self, forKey: .isMedia) ?? false
-        id = relativePath
+        id = relativePath.isEmpty ? name : relativePath
     }
     
     // Manual initializer for previews
@@ -69,6 +69,13 @@ struct FileListResponse: Codable {
         case currentPath = "current_path"
         case breadcrumbs
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        items = try container.decodeIfPresent([FileItem].self, forKey: .items) ?? []
+        currentPath = try container.decodeIfPresent(String.self, forKey: .currentPath) ?? ""
+        breadcrumbs = try container.decodeIfPresent([Breadcrumb].self, forKey: .breadcrumbs) ?? []
+    }
 }
 
 struct Breadcrumb: Codable, Identifiable {
@@ -80,6 +87,18 @@ struct Breadcrumb: Codable, Identifiable {
         self.name = name
         self.path = path
         self.id = path
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        path = try container.decodeIfPresent(String.self, forKey: .path) ?? ""
+        id = path.isEmpty ? name : path
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case name
+        case path
     }
 }
 

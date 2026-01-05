@@ -144,6 +144,11 @@ class NetworkService {
         do {
             return try decoder.decode(FileListResponse.self, from: data)
         } catch {
+            // Log the actual JSON response for debugging
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Failed to decode file list. Response: \(jsonString)")
+            }
+            print("Decoding error: \(error)")
             throw NetworkError.decodingError(error)
         }
     }
@@ -233,7 +238,7 @@ class NetworkService {
         
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             if let errorData = try? JSONDecoder().decode([String: String].self, from: data),
-               let errorMessage = errorData["error"] {
+               let _ = errorData["error"] {
                 throw NetworkError.httpError(httpResponse.statusCode)
             }
             throw NetworkError.httpError(httpResponse.statusCode)
@@ -272,7 +277,7 @@ class NetworkService {
         
         guard httpResponse.statusCode == 200 else {
             if let errorData = try? JSONDecoder().decode([String: String].self, from: data),
-               let errorMessage = errorData["error"] {
+               let _ = errorData["error"] {
                 throw NetworkError.httpError(httpResponse.statusCode)
             }
             throw NetworkError.httpError(httpResponse.statusCode)

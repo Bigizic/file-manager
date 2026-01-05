@@ -9,7 +9,6 @@ import SwiftUI
 
 struct ServerConnectionView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var themeManager: ThemeManager
     @StateObject private var viewModel = ServerConnectionViewModel()
     @State private var serverURL: String = ""
     @State private var showError: Bool = false
@@ -21,15 +20,15 @@ struct ServerConnectionView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "server.rack")
                         .font(.system(size: 48))
-                        .foregroundColor(themeManager.currentTheme.accentColor)
+                        .foregroundColor(.accentColor)
                     
                     Text("Connect to Server")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(themeManager.currentTheme.textColor)
+                        .foregroundColor(.primary)
                     
                     Text("Enter server URL, IP address, or IP:port")
                         .font(.system(size: 14))
-                        .foregroundColor(themeManager.currentTheme.textColor.opacity(0.7))
+                        .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 20)
@@ -38,17 +37,17 @@ struct ServerConnectionView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Server Address")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(themeManager.currentTheme.textColor)
+                        .foregroundColor(.primary)
                     
-                    TextField("", text: $serverURL, prompt: Text("").foregroundColor(themeManager.currentTheme.textColor.opacity(0.3)))
-                        .textFieldStyle(ThemedTextFieldStyle(theme: themeManager.currentTheme))
+                    TextField("", text: $serverURL, prompt: Text("http://192.168.1.120:5000").foregroundColor(.secondary))
+                        .textFieldStyle(.roundedBorder)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                         .keyboardType(.URL)
                     
                     Text("Examples: 192.168.1.120:5000, http://server.com, http://192.168.1.120")
                         .font(.system(size: 12))
-                        .foregroundColor(themeManager.currentTheme.textColor.opacity(0.6))
+                        .foregroundColor(.secondary)
                 }
                 .padding(.horizontal)
                 
@@ -56,22 +55,22 @@ struct ServerConnectionView: View {
                 if let currentServer = viewModel.currentServer {
                     VStack(spacing: 12) {
                         Divider()
-                            .background(themeManager.currentTheme.borderColor)
+                            .background(Color(UIColor.separator))
                         
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Current Server")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(themeManager.currentTheme.textColor.opacity(0.7))
+                                    .foregroundColor(.secondary)
                                 
                                 Text(currentServer.serverURL)
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(themeManager.currentTheme.textColor)
+                                    .foregroundColor(.primary)
                                 
                                 if let serverName = currentServer.serverName {
                                     Text(serverName)
                                         .font(.system(size: 12))
-                                        .foregroundColor(themeManager.currentTheme.textColor.opacity(0.6))
+                                        .foregroundColor(.secondary)
                                 }
                             }
                             
@@ -89,10 +88,10 @@ struct ServerConnectionView: View {
                             }
                         }
                         .padding()
-                        .background(themeManager.currentTheme.cardBackgroundColor)
+                        .background(Color(UIColor.secondarySystemBackground))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(themeManager.currentTheme.cardBorderColor, lineWidth: 1)
+                                .stroke(Color(UIColor.separator), lineWidth: 1)
                         )
                         .cornerRadius(8)
                         
@@ -112,10 +111,10 @@ struct ServerConnectionView: View {
                             .foregroundColor(.orange)
                         Text(error)
                             .font(.system(size: 12))
-                            .foregroundColor(themeManager.currentTheme.textColor)
+                            .foregroundColor(.primary)
                     }
                     .padding()
-                    .background(themeManager.currentTheme.cardBackgroundColor)
+                    .background(Color(UIColor.secondarySystemBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.orange, lineWidth: 1)
@@ -148,7 +147,7 @@ struct ServerConnectionView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(themeManager.currentTheme.accentColor)
+                    .background(Color.accentColor)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
@@ -157,21 +156,20 @@ struct ServerConnectionView: View {
                 .padding(.horizontal)
                 .padding(.bottom)
             }
-            .background(themeManager.currentTheme.backgroundColor)
+            .background(Color(UIColor.systemBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(themeManager.currentTheme.textColor)
+                    .foregroundColor(.primary)
                 }
             }
-        }
-        .applyTheme(themeManager.currentTheme)
-        .onAppear {
-            if let currentServer = viewModel.currentServer {
-                serverURL = currentServer.serverURL
+            .onAppear {
+                if let currentServer = viewModel.currentServer {
+                    serverURL = currentServer.serverURL
+                }
             }
         }
     }
@@ -179,6 +177,4 @@ struct ServerConnectionView: View {
 
 #Preview {
     ServerConnectionView()
-        .environmentObject(ThemeManager.shared)
 }
-

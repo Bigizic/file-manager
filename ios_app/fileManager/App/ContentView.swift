@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var appState: AppState
     @State private var selectedTab: TabSelection = .home
     
@@ -38,13 +37,11 @@ struct ContentView: View {
                 }
                 .tag(TabSelection.notes)
         }
-        .applyTheme(themeManager.currentTheme)
     }
 }
 
 #Preview {
     ContentView()
-        .environmentObject(ThemeManager.shared)
         .environmentObject(AppState.shared)
 }
 
