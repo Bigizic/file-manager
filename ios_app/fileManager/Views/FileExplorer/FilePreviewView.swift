@@ -7,37 +7,51 @@
 
 import SwiftUI
 import UIKit
+import AVKit
 
 struct FilePreviewView: View {
     let file: FileItem
+    let currentPath: String
+    let onCopy: () -> Void
+    let onCut: () -> Void
+    let onMove: () -> Void
+    let onDelete: () -> Void
+    let onDownload: () -> Void
+    let onInfo: () -> Void
+    let hasClipboard: Bool
     
     @Environment(\.dismiss) var dismiss
+    @StateObject private var viewModel = FileExplorerViewModel()
     @State private var imageData: Data?
+    @State private var videoURL: URL?
     @State private var isLoading = true
     @State private var errorMessage: String?
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor.systemBackground)
+                Color.black
                     .ignoresSafeArea()
                 
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else if let error = errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 48))
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(.white)
                         
                         Text(error)
                             .font(.system(size: 16))
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                     }
                     .padding()
-                } else if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                } else if file.isVideo, let videoURL = videoURL {
+                    VideoPlayer(player: AVPlayer(url: videoURL))
+                        .edgesIgnoringSafeArea(.all)
+                } else if file.isImage, let imageData = imageData, let uiImage = UIImage(data: imageData) {
                     ScrollView {
                         Image(uiImage: uiImage)
                             .resizable()
@@ -47,17 +61,65 @@ struct FilePreviewView: View {
                 } else {
                     Text("Preview not available")
                         .font(.system(size: 16))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white)
                 }
             }
             .navigationTitle(file.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Menu {
+                        Button(action: onCopy) {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                        
+                        Button(action: onCut) {
+                            Label("Cut", systemImage: "scissors")
+                        }
+                        
+                        if hasClipboard {
+                            Divider()
+                            Button(action: {
+                                Task {
+                                    await viewModel.pasteFile(targetDirectory: currentPath)
+                                }
+                            }) {
+                                Label("Paste", systemImage: "doc.on.clipboard")
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        Button(action: onMove) {
+                            Label("Move", systemImage: "folder")
+                        }
+                        
+                        Button(action: onDownload) {
+                            Label("Download", systemImage: "arrow.down.circle")
+                        }
+                        
+                        Divider()
+                        
+                        Button(action: onInfo) {
+                            Label("Information", systemImage: "info.circle")
+                        }
+                        
+                        Divider()
+                        
+                        Button(role: .destructive, action: onDelete) {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(.white)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.white)
                 }
             }
             .onAppear {
@@ -71,7 +133,14 @@ struct FilePreviewView: View {
             do {
                 let data = try await NetworkService.shared.downloadFile(path: file.relativePath)
                 await MainActor.run {
-                    self.imageData = data
+                    if file.isVideo {
+                        // Save video to temporary file for AVPlayer
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
+                        try? data.write(to: tempURL)
+                        self.videoURL = tempURL
+                    } else {
+                        self.imageData = data
+                    }
                     self.isLoading = false
                 }
             } catch {

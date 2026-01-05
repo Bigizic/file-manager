@@ -91,9 +91,9 @@ struct Breadcrumb: Codable, Identifiable {
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
         path = try container.decodeIfPresent(String.self, forKey: .path) ?? ""
-        id = path.isEmpty ? name : path
+        id = path.isEmpty ? (name.isEmpty ? "root" : name) : path
     }
     
     enum CodingKeys: String, CodingKey {
