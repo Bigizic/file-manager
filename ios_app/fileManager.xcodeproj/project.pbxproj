@@ -18,6 +18,7 @@
 		AA000011 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012 /* HomeView.swift */; };
 		AA000013 /* FileExplorerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014 /* FileExplorerView.swift */; };
 		AA000015 /* FilePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000016 /* FilePreviewView.swift */; };
+		AA000058 /* FileInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000059 /* FileInfoView.swift */; };
 		AA000017 /* NotesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000018 /* NotesListView.swift */; };
 		AA000019 /* NoteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00001A /* NoteDetailView.swift */; };
 		AA00001B /* NoteEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00001C /* NoteEditView.swift */; };
@@ -31,6 +32,7 @@
 		AA000052 /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000051 /* ServerSettings.swift */; };
 		AA000053 /* ServerConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000054 /* ServerConnectionViewModel.swift */; };
 		AA000055 /* ServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000050 /* ServerConnectionView.swift */; };
+		AA000056 /* FileInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000057 /* FileInfo.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,7 @@
 		AA000012 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		AA000014 /* FileExplorerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileExplorerView.swift; sourceTree = "<group>"; };
 		AA000016 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
+		AA000059 /* FileInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInfoView.swift; sourceTree = "<group>"; };
 		AA000018 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
 		AA00001A /* NoteDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDetailView.swift; sourceTree = "<group>"; };
 		AA00001C /* NoteEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditView.swift; sourceTree = "<group>"; };
@@ -59,6 +62,7 @@
 		AA000051 /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
 		AA000054 /* ServerConnectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionViewModel.swift; sourceTree = "<group>"; };
 		AA000050 /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
+		AA000057 /* FileInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInfo.swift; sourceTree = "<group>"; };
 		AA00002C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA00002D /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -125,6 +129,7 @@
 				AA00000E /* Note.swift */,
 				AA000010 /* Theme.swift */,
 				AA000051 /* ServerSettings.swift */,
+				AA000057 /* FileInfo.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -205,6 +210,7 @@
 			children = (
 				AA000014 /* FileExplorerView.swift */,
 				AA000016 /* FilePreviewView.swift */,
+				AA000059 /* FileInfoView.swift */,
 			);
 			path = FileExplorer;
 			sourceTree = "<group>";
@@ -306,6 +312,8 @@
 				AA000052 /* ServerSettings.swift in Sources */,
 				AA000053 /* ServerConnectionViewModel.swift in Sources */,
 				AA000055 /* ServerConnectionView.swift in Sources */,
+				AA000058 /* FileInfoView.swift in Sources */,
+				AA000056 /* FileInfo.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

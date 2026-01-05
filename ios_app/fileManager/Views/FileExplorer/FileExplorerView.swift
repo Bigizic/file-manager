@@ -33,93 +33,161 @@ struct FileExplorerView: View {
     @State private var showDocumentPicker = false
     @State private var showFileSavePicker = false
     
+    // MARK: - Computed Properties
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        if viewModel.isLoading {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+        } else if let successMessage = viewModel.downloadSuccessMessage {
+            successMessageView(message: successMessage)
+        } else if let error = viewModel.errorMessage {
+            FileExplorerErrorView(message: error) {
+                viewModel.loadFiles(path: currentPath)
+            }
+        } else {
+            fileListContent
+        }
+    }
+    
+    private var fileListContent: some View {
+        VStack(spacing: 0) {
+            // Breadcrumb Navigation
+            if !viewModel.breadcrumbs.isEmpty {
+                BreadcrumbView(
+                    breadcrumbs: viewModel.breadcrumbs
+                ) { path in
+                    currentPath = path
+                    viewModel.loadFiles(path: path)
+                }
+            }
+            
+            // File List
+            if viewModel.files.isEmpty {
+                EmptyStateView(
+                    message: "No files or folders found"
+                )
+            } else {
+                fileListView
+            }
+        }
+    }
+    
+    private var fileListView: some View {
+        List {
+            ForEach(viewModel.files) { file in
+                FileRowView(file: file) {
+                    handleFileTap(file: file)
+                }
+                .listRowBackground(Color(UIColor.secondarySystemBackground))
+                .contextMenu {
+                    fileContextMenu(for: file)
+                }
+            }
+        }
+        .listStyle(PlainListStyle())
+        .background(Color(UIColor.systemBackground))
+    }
+    
+    @ViewBuilder
+    private func fileContextMenu(for file: FileItem) -> some View {
+        FileContextMenu(
+            file: file,
+            hasClipboard: viewModel.clipboardPath != nil,
+            onCopy: { Task { await viewModel.copyFile(file) } },
+            onCut: { Task { await viewModel.cutFile(file) } },
+            onRename: {
+                fileToRename = file
+                renameText = file.name
+                showRenameAlert = true
+            },
+            onDelete: {
+                fileToDelete = file
+                showDeleteAlert = true
+            },
+            onMove: {
+                fileToMove = file
+                showMoveSheet = true
+            },
+            onDownload: {
+                Task {
+                    await viewModel.downloadFile(file: file, relativePath: currentPath)
+                }
+            },
+            onInfo: {
+                fileToShowInfo = file
+                showFileInfo = true
+            }
+        )
+    }
+    
+    private func successMessageView(message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.green)
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .padding()
+        }
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            if viewModel.clipboardPath != nil {
+                Button(action: {
+                    Task {
+                        await viewModel.pasteFile(targetDirectory: currentPath)
+                    }
+                }) {
+                    Image(systemName: "doc.on.clipboard")
+                        .foregroundColor(.accentColor)
+                }
+            }
+            
+            Menu {
+                Button(action: {
+                    showCreateFileAlert = true
+                }) {
+                    Label("New File", systemImage: "doc.badge.plus")
+                }
+                
+                Button(action: {
+                    showCreateFolderAlert = true
+                }) {
+                    Label("New Folder", systemImage: "folder.badge.plus")
+                }
+                
+                Button(action: {
+                    showDocumentPicker = true
+                }) {
+                    Label("Upload File", systemImage: "square.and.arrow.up")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .foregroundColor(.accentColor)
+            }
+            
+            Button(action: {
+                viewModel.loadFiles(path: currentPath)
+            }) {
+                Image(systemName: "arrow.clockwise")
+                    .foregroundColor(.accentColor)
+            }
+        }
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
                 Color(UIColor.systemBackground)
                     .ignoresSafeArea()
                 
-                if viewModel.isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
-                } else if let successMessage = viewModel.downloadSuccessMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(.green)
-                        Text(successMessage)
-                            .font(.system(size: 14))
-                            .foregroundColor(.primary)
-                            .multilineTextAlignment(.center)
-                            .padding()
-                    }
-                } else if let error = viewModel.errorMessage {
-                    FileExplorerErrorView(message: error) {
-                        viewModel.loadFiles(path: currentPath)
-                    }
-                } else {
-                    VStack(spacing: 0) {
-                        // Breadcrumb Navigation
-                        if !viewModel.breadcrumbs.isEmpty {
-                            BreadcrumbView(
-                                breadcrumbs: viewModel.breadcrumbs
-                            ) { path in
-                                currentPath = path
-                                viewModel.loadFiles(path: path)
-                            }
-                        }
-                        
-                        // File List
-                        if viewModel.files.isEmpty {
-                            EmptyStateView(
-                                message: "No files or folders found"
-                            )
-                        } else {
-                            List {
-                                ForEach(viewModel.files) { file in
-                                    FileRowView(
-                                        file: file
-                                    ) {
-                                        handleFileTap(file: file)
-                                    }
-                                    .listRowBackground(Color(UIColor.secondarySystemBackground))
-                                    .contextMenu {
-                                        FileContextMenu(
-                                            file: file,
-                                            hasClipboard: viewModel.clipboardPath != nil,
-                                            onCopy: { Task { await viewModel.copyFile(file) } },
-                                            onCut: { Task { await viewModel.cutFile(file) } },
-                                            onRename: {
-                                                fileToRename = file
-                                                renameText = file.name
-                                                showRenameAlert = true
-                                            },
-                                            onDelete: {
-                                                fileToDelete = file
-                                                showDeleteAlert = true
-                                            },
-                                            onMove: {
-                                                fileToMove = file
-                                                showMoveSheet = true
-                                            },
-                                            onDownload: {
-                                                Task {
-                                                    await viewModel.downloadFile(file: file, relativePath: currentPath)
-                                                }
-                                            },
-                                            onInfo: {
-                                                fileToShowInfo = file
-                                                showFileInfo = true
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            .listStyle(PlainListStyle())
-                            .background(Color(UIColor.systemBackground))
-                        }
-                    }
-                }
+                mainContent
             }
             .navigationTitle("File Explorer")
             .navigationBarTitleDisplayMode(.large)

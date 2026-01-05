@@ -94,8 +94,6 @@ class FileExplorerViewModel: ObservableObject {
         }
         
         // Clear clipboard immediately (even if paste fails)
-        let savedPath = clipboardPath
-        let savedOperation = clipboardOperation
         clipboardPath = nil
         clipboardOperation = nil
         
@@ -214,7 +212,7 @@ class FileExplorerViewModel: ObservableObject {
         }
         
         // Save file
-        let fileURL = targetDir.appendingPathComponent(file.name)
+        var fileURL = targetDir.appendingPathComponent(file.name)
         
         do {
             try data.write(to: fileURL)

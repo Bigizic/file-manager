@@ -166,6 +166,14 @@ struct FilePreviewView: View {
             isImage: true,
             isVideo: false,
             isMedia: true
-        )
+        ),
+        currentPath: "",
+        onCopy: {},
+        onCut: {},
+        onMove: {},
+        onDelete: {},
+        onDownload: {},
+        onInfo: {},
+        hasClipboard: false
     )
 }
