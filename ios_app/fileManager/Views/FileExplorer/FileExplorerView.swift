@@ -169,6 +169,30 @@ struct FileExplorerView: View {
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(true)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    if !currentPath.isEmpty {
+                        // Navigate to parent directory
+                        let pathComponents = currentPath.components(separatedBy: "/").filter { !$0.isEmpty }
+                        if pathComponents.count > 1 {
+                            let parentPath = pathComponents.dropLast().joined(separator: "/")
+                            currentPath = parentPath
+                            viewModel.loadFiles(path: parentPath)
+                        } else {
+                            // Go to root
+                            currentPath = ""
+                            viewModel.loadFiles(path: "")
+                        }
+                    } else {
+                        // At root, dismiss/pop navigation if possible
+                        dismiss()
+                    }
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+            }
+            
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if viewModel.clipboardPath != nil {
                         Button(action: {
