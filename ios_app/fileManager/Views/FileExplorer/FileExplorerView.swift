@@ -12,6 +12,7 @@ import AVFoundation
 
 struct FileExplorerView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = FileExplorerViewModel()
     @State private var currentPath: String = ""
     
@@ -25,7 +26,6 @@ struct FileExplorerView: View {
     @State private var showDeleteAlert = false
     @State private var showCreateFileAlert = false
     @State private var showCreateFolderAlert = false
-    @State private var showMoveSheet = false
     @State private var renameText = ""
     @State private var newFileName = ""
     @State private var newFolderName = ""
@@ -52,14 +52,7 @@ struct FileExplorerView: View {
     private var fileListContent: some View {
         VStack(spacing: 0) {
             // Breadcrumb Navigation
-            if !viewModel.breadcrumbs.isEmpty {
-                BreadcrumbView(
-                    breadcrumbs: viewModel.breadcrumbs
-                ) { path in
-                    currentPath = path
-                    viewModel.loadFiles(path: path)
-                }
-            }
+
             
             // File List
             if viewModel.files.isEmpty {
@@ -106,7 +99,6 @@ struct FileExplorerView: View {
             },
             onMove: {
                 fileToMove = file
-                showMoveSheet = true
             },
             onDownload: {
                 Task {
@@ -167,17 +159,17 @@ struct FileExplorerView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(UIColor.systemBackground)
-                    .ignoresSafeArea()
-                
-                mainContent
-            }
-            .navigationTitle("File Explorer")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+        ZStack {
+            Color(UIColor.systemBackground)
+                .ignoresSafeArea()
+            
+            mainContent
+        }
+        .navigationTitle("File Explorer")
+        .navigationBarTitleDisplayMode(.large)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if viewModel.clipboardPath != nil {
                         Button(action: {
                             Task {
@@ -219,17 +211,17 @@ struct FileExplorerView: View {
                             .foregroundColor(.accentColor)
                     }
                 }
-            }
-            .onAppear {
-                viewModel.notificationManager = appState.notificationManager
-                viewModel.loadFiles(path: currentPath)
-            }
-            .sheet(isPresented: $showFileInfo) {
+        }
+        .onAppear {
+            viewModel.notificationManager = appState.notificationManager
+            viewModel.loadFiles(path: currentPath)
+        }
+        .sheet(isPresented: $showFileInfo) {
                 if let file = fileToShowInfo {
                     FileInfoView(file: file)
                 }
             }
-            .sheet(item: $selectedFile) { file in
+        .sheet(item: $selectedFile) { file in
                 FilePreviewView(
                     file: file,
                     currentPath: currentPath,
@@ -237,7 +229,6 @@ struct FileExplorerView: View {
                     onCut: { Task { await viewModel.cutFile(file) } },
                     onMove: {
                         fileToMove = file
-                        showMoveSheet = true
                     },
                     onDelete: {
                         fileToDelete = file
@@ -255,24 +246,22 @@ struct FileExplorerView: View {
                     hasClipboard: viewModel.clipboardPath != nil
                 )
             }
-            .sheet(isPresented: $showMoveSheet) {
-                if let file = fileToMove {
-                    MoveFileView(
-                        file: file,
-                        currentPath: currentPath,
-                        breadcrumbs: viewModel.breadcrumbs,
-                        viewModel: viewModel,
-                        onMove: { targetPath in
-                            Task {
-                                await viewModel.moveFile(file, targetDirectory: targetPath, currentPath: currentPath)
-                                showMoveSheet = false
-                            }
+        .sheet(item: $fileToMove) { file in
+                MoveFileView(
+                    file: file,
+                    currentPath: currentPath,
+                    breadcrumbs: viewModel.breadcrumbs,
+                    viewModel: viewModel,
+                    onMove: { targetPath in
+                        Task {
+                            await viewModel.moveFile(file, targetDirectory: targetPath, currentPath: currentPath)
+                            fileToMove = nil
                         }
-                    )
-                    .id(file.id) // Force new view instance when file changes
-                }
+                    }
+                )
+                .id(file.id) // Force new view instance when file changes
             }
-            .alert("Rename", isPresented: $showRenameAlert) {
+        .alert("Rename", isPresented: $showRenameAlert) {
                 TextField("New name", text: $renameText)
                 Button("Cancel", role: .cancel) { }
                 Button("Rename") {
@@ -285,7 +274,7 @@ struct FileExplorerView: View {
             } message: {
                 Text("Enter new name for \(fileToRename?.name ?? "item")")
             }
-            .alert("Delete", isPresented: $showDeleteAlert) {
+        .alert("Delete", isPresented: $showDeleteAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
                     if let file = fileToDelete {
@@ -297,7 +286,7 @@ struct FileExplorerView: View {
             } message: {
                 Text("Are you sure you want to delete \(fileToDelete?.name ?? "this item")?")
             }
-            .alert("New File", isPresented: $showCreateFileAlert) {
+        .alert("New File", isPresented: $showCreateFileAlert) {
                 TextField("File name", text: $newFileName)
                 Button("Cancel", role: .cancel) { }
                 Button("Create") {
@@ -311,7 +300,7 @@ struct FileExplorerView: View {
             } message: {
                 Text("Enter file name")
             }
-            .alert("New Folder", isPresented: $showCreateFolderAlert) {
+        .alert("New Folder", isPresented: $showCreateFolderAlert) {
                 TextField("Folder name", text: $newFolderName)
                 Button("Cancel", role: .cancel) { }
                 Button("Create") {
@@ -325,7 +314,7 @@ struct FileExplorerView: View {
             } message: {
                 Text("Enter folder name")
             }
-            .fileImporter(
+        .fileImporter(
                 isPresented: $showDocumentPicker,
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: false
@@ -361,7 +350,7 @@ struct FileExplorerView: View {
                 }
             }
         }
-    }
+    
     
     private func handleFileTap(file: FileItem) {
         if file.isDirectory {
@@ -439,128 +428,194 @@ struct MoveFileView: View {
     let onMove: (String) -> Void
     
     @Environment(\.dismiss) var dismiss
-    @State private var directories: [FileItem] = []
+    @State private var navigationPath: String = "" // Start at root
+    @State private var items: [FileItem] = []
+    @State private var navigationBreadcrumbs: [Breadcrumb] = []
     @State private var isLoading = true
+    @State private var errorMessage: String?
     
     var body: some View {
         NavigationView {
-            Group {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
-                } else {
-                    List {
-                        Section("Current Location") {
-                            Text(currentPath.isEmpty ? "Root" : currentPath)
+            VStack(spacing: 0) {
+                // Main content
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let errorMsg = errorMessage {
+                        VStack(spacing: 16) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 48))
+                                .foregroundColor(.orange)
+                            Text(errorMsg)
+                                .font(.system(size: 16))
                                 .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Button("Retry") {
+                                errorMessage = nil
+                                loadDirectory(path: navigationPath)
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        
-                        Section("Parent Directories") {
-                            Button(action: {
-                                onMove("")
-                            }) {
-                                HStack {
-                                    Image(systemName: "house.fill")
-                                        .foregroundColor(.accentColor)
-                                    Text("Root")
-                                    Spacer()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        List {
+                            // Breadcrumb navigation
+                            if !navigationBreadcrumbs.isEmpty {
+                                Section {
+                                    // Root button
+                                    Button(action: {
+                                        navigateToPath("")
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "house.fill")
+                                                .foregroundColor(.accentColor)
+                                            Text("Root")
+                                            Spacer()
+                                        }
+                                    }
+                                    
+                                    // Parent directories
+                                    ForEach(navigationBreadcrumbs) { breadcrumb in
+                                        if !breadcrumb.path.isEmpty {
+                                            Button(action: {
+                                                navigateToPath(breadcrumb.path)
+                                            }) {
+                                                HStack {
+                                                    Image(systemName: "folder.fill")
+                                                        .foregroundColor(.accentColor)
+                                                    Text(breadcrumb.name)
+                                                    Spacer()
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            }
+                                        }
+                                    }
+                                } header: {
+                                    Text("Navigation")
                                 }
                             }
                             
-                            ForEach(breadcrumbs) { breadcrumb in
-                                if !breadcrumb.path.isEmpty {
-                                    Button(action: {
-                                        onMove(breadcrumb.path)
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "folder.fill")
-                                                .foregroundColor(.accentColor)
-                                            Text(breadcrumb.name)
-                                            Spacer()
+                            // Current directory contents
+                            if !items.isEmpty {
+                                Section {
+                                    ForEach(items) { item in
+                                        if item.isDirectory {
+                                            Button(action: {
+                                                navigateToPath(item.relativePath)
+                                            }) {
+                                                HStack {
+                                                    Image(systemName: "folder.fill")
+                                                        .foregroundColor(.accentColor)
+                                                        .font(.system(size: 20))
+                                                    Text(item.name)
+                                                    Spacer()
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                            }
                                         }
                                     }
+                                } header: {
+                                    Text(navigationPath.isEmpty ? "Root Directory" : "Contents")
                                 }
-                            }
-                        }
-                        
-                        if !directories.isEmpty {
-                            Section("Subdirectories") {
-                                ForEach(directories) { directory in
-                                    Button(action: {
-                                        onMove(directory.relativePath)
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "folder.fill")
-                                                .foregroundColor(.accentColor)
-                                            Text(directory.name)
-                                            Spacer()
-                                        }
-                                    }
+                            } else if !isLoading && errorMessage == nil {
+                                Section {
+                                    Text("No directories found")
+                                        .foregroundColor(.secondary)
                                 }
-                            }
-                        } else if !isLoading {
-                            Section {
-                                Text("No subdirectories found")
-                                    .foregroundColor(.secondary)
                             }
                         }
                     }
                 }
+                
+                // Bottom buttons
+                VStack(spacing: 12) {
+                    Button(action: {
+                        onMove(navigationPath)
+                    }) {
+                        Text("Move Here")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.accentColor)
+                            .cornerRadius(10)
+                    }
+                    
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(10)
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.systemBackground))
             }
             .navigationTitle("Move \(file.name)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                // Reset and load directories every time view appears
-                isLoading = true
-                directories = []
-                loadDirectories()
+            .task {
+                // Use task instead of onAppear to ensure it runs
+                // Start at root
+                navigationPath = ""
+                loadDirectory(path: "")
             }
         }
     }
     
-    private func loadDirectories() {
+    private func navigateToPath(_ path: String) {
+        navigationPath = path
+        errorMessage = nil
+        loadDirectory(path: path)
+    }
+    
+    private func loadDirectory(path: String) {
+        isLoading = true
+        errorMessage = nil
+        
         Task {
-            // Load directories from current directory
             do {
-                let response = try await viewModel.networkService.fetchFileList(path: currentPath)
-                let currentDirs = response.items.filter { $0.isDirectory }
-                
-                // Also load directories from root
-                let rootResponse = try await viewModel.networkService.fetchFileList(path: "")
-                let rootDirs = rootResponse.items.filter { $0.isDirectory }
-                
-                // Combine and remove duplicates
-                var allDirs: [FileItem] = []
-                var seenPaths: Set<String> = []
-                
-                for dir in rootDirs {
-                    if !seenPaths.contains(dir.relativePath) {
-                        allDirs.append(dir)
-                        seenPaths.insert(dir.relativePath)
-                    }
-                }
-                
-                for dir in currentDirs {
-                    if !seenPaths.contains(dir.relativePath) {
-                        allDirs.append(dir)
-                        seenPaths.insert(dir.relativePath)
-                    }
-                }
+                let response = try await viewModel.networkService.fetchFileList(path: path)
                 
                 await MainActor.run {
-                    self.directories = allDirs.sorted { $0.name < $1.name }
+                    // Filter to show only directories
+                    self.items = response.items.filter { $0.isDirectory }
+                    self.navigationBreadcrumbs = response.breadcrumbs
                     self.isLoading = false
+                    self.errorMessage = nil
                 }
             } catch {
                 await MainActor.run {
+                    let errorMsg: String
+                    if let networkError = error as? NetworkError {
+                        switch networkError {
+                        case .httpError(let code, let message):
+                            errorMsg = message ?? "HTTP Error \(code)"
+                        case .invalidURL:
+                            errorMsg = "Invalid URL"
+                        case .invalidResponse:
+                            errorMsg = "Invalid response from server"
+                        case .decodingError(let decodingError):
+                            errorMsg = "Failed to parse response: \(decodingError.localizedDescription)"
+                        }
+                    } else {
+                        errorMsg = error.localizedDescription
+                    }
+                    self.items = []
+                    self.navigationBreadcrumbs = []
                     self.isLoading = false
+                    self.errorMessage = errorMsg
                 }
             }
         }
@@ -763,3 +818,4 @@ struct EmptyStateView: View {
     FileExplorerView()
         .environmentObject(AppState.shared)
 }
+

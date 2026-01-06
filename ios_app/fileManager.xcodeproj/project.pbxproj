@@ -29,6 +29,7 @@
 		AA000025 /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000026 /* NetworkService.swift */; };
 		AA000027 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000028 /* ThemeManager.swift */; };
 		AA000029 /* ThemeExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00002A /* ThemeExtensions.swift */; };
+		AA000062 /* IOSNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000063 /* IOSNotificationManager.swift */; };
 		AA000052 /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000051 /* ServerSettings.swift */; };
 		AA000053 /* ServerConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000054 /* ServerConnectionViewModel.swift */; };
 		AA000055 /* ServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000050 /* ServerConnectionView.swift */; };
@@ -59,6 +60,7 @@
 		AA000026 /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
 		AA000028 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		AA00002A /* ThemeExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeExtensions.swift; sourceTree = "<group>"; };
+		AA000063 /* IOSNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSNotificationManager.swift; sourceTree = "<group>"; };
 		AA00002B /* fileManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fileManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000051 /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
 		AA000054 /* ServerConnectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionViewModel.swift; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 			isa = PBXGroup;
 			children = (
 				AA000028 /* ThemeManager.swift */,
+				AA000063 /* IOSNotificationManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -311,6 +314,7 @@
 				AA000023 /* NoteEditViewModel.swift in Sources */,
 				AA000025 /* NetworkService.swift in Sources */,
 				AA000027 /* ThemeManager.swift in Sources */,
+				AA000062 /* IOSNotificationManager.swift in Sources */,
 				AA000029 /* ThemeExtensions.swift in Sources */,
 				AA000052 /* ServerSettings.swift in Sources */,
 				AA000053 /* ServerConnectionViewModel.swift in Sources */,

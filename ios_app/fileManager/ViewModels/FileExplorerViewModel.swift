@@ -16,7 +16,6 @@ class FileExplorerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var clipboardPath: String?
     @Published var clipboardOperation: String? // "copy" or "cut"
-    @Published var downloadSuccessMessage: String?
     
     let networkService = NetworkService.shared
     var notificationManager: NotificationManager?
@@ -290,16 +289,18 @@ class FileExplorerViewModel: ObservableObject {
             try? fileURL.setResourceValues(resourceValues)
             
             await MainActor.run {
-                // File saved successfully - show success notification
-                let pathDisplay: String
+                // File saved successfully - show iOS notification
+                let directoryPath: String
                 if relativePath.isEmpty {
-                    pathDisplay = "FileManager/\(serverName)/\(file.name)"
+                    directoryPath = "FileManager/\(serverName)"
                 } else {
-                    pathDisplay = "FileManager/\(serverName)/\(relativePath)/\(file.name)"
+                    directoryPath = "FileManager/\(serverName)/\(relativePath)"
                 }
-                let message = "Downloaded: \(file.name)"
-                downloadSuccessMessage = message
-                notificationManager?.show(NotificationItem(message: message, type: .success, duration: 3.0))
+                
+                IOSNotificationManager.shared.showDownloadSuccessNotification(
+                    fileName: file.name,
+                    directory: directoryPath
+                )
                 print("File saved successfully to: \(fileURL.path)")
             }
         } catch {

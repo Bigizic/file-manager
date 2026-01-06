@@ -374,9 +374,15 @@ class NetworkService {
         }
         
         guard httpResponse.statusCode == 200 else {
+            // Try to decode error message
             if let errorData = try? JSONDecoder().decode([String: String].self, from: data),
-               let _ = errorData["error"] {
-                throw NetworkError.httpError(httpResponse.statusCode)
+               let errorMessage = errorData["error"] {
+                throw NetworkError.httpError(httpResponse.statusCode, message: errorMessage)
+            }
+            // Try to parse JSON manually to extract error message
+            if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorMessage = jsonObject["error"] as? String {
+                throw NetworkError.httpError(httpResponse.statusCode, message: errorMessage)
             }
             throw NetworkError.httpError(httpResponse.statusCode)
         }

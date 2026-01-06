@@ -57,7 +57,7 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("File Explorer - Home")
+                    Text("Home")
                         .font(.headline)
                         .foregroundColor(.primary)
                 }
@@ -66,14 +66,20 @@ struct HomeView: View {
                     Button(action: {
                         showServerConnection = true
                     }) {
-                        Image(systemName: "plus")
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
-                            .padding(8)
-                            .background(
-                                (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
-                                    .background(.ultraThinMaterial)
-                            )
-                            .clipShape(Circle())
+                        HStack(spacing: 4) {
+                            Image(systemName: "server.rack")
+                                .font(.system(size: 14))
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(colorScheme == .dark ? .white : .black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            (colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.8))
+                                .background(.ultraThinMaterial)
+                        )
+                        .clipShape(Capsule())
                     }
                 }
             }
@@ -107,6 +113,8 @@ struct HomeButton: View {
                 Text(description)
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
             }
             
             Spacer()
