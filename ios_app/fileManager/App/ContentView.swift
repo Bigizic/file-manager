@@ -37,6 +37,7 @@ struct ContentView: View {
                 }
                 .tag(TabSelection.notes)
         }
+        .notificationOverlay(notificationManager: appState.notificationManager)
     }
 }
 

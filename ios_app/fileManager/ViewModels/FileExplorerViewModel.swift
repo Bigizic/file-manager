@@ -18,7 +18,8 @@ class FileExplorerViewModel: ObservableObject {
     @Published var clipboardOperation: String? // "copy" or "cut"
     @Published var downloadSuccessMessage: String?
     
-    private let networkService = NetworkService.shared
+    let networkService = NetworkService.shared
+    var notificationManager: NotificationManager?
     
     func loadFiles(path: String = "") {
         isLoading = true
@@ -31,8 +32,11 @@ class FileExplorerViewModel: ObservableObject {
                 self.breadcrumbs = response.breadcrumbs
                 self.isLoading = false
             } catch {
-                self.errorMessage = error.localizedDescription
+                let errorMsg = extractErrorMessage(from: error)
+                self.errorMessage = errorMsg
                 self.isLoading = false
+                // Show notification for load errors too
+                notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
             }
         }
     }
@@ -44,7 +48,9 @@ class FileExplorerViewModel: ObservableObject {
             await saveFileToDevice(data: data, file: file, relativePath: relativePath)
         } catch {
             await MainActor.run {
-                errorMessage = "Failed to download file: \(error.localizedDescription)"
+                let errorMsg = extractErrorMessage(from: error)
+                errorMessage = errorMsg
+                notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
             }
         }
     }
@@ -54,7 +60,9 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.deleteFile(path: file.relativePath)
             loadFiles(path: currentPath)
         } catch {
-            errorMessage = "Failed to delete: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
@@ -63,7 +71,9 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.renameFile(path: file.relativePath, newName: newName)
             loadFiles(path: currentPath)
         } catch {
-            errorMessage = "Failed to rename: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
@@ -73,7 +83,9 @@ class FileExplorerViewModel: ObservableObject {
             clipboardPath = file.relativePath
             clipboardOperation = "copy"
         } catch {
-            errorMessage = "Failed to copy: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
@@ -83,13 +95,17 @@ class FileExplorerViewModel: ObservableObject {
             clipboardPath = file.relativePath
             clipboardOperation = "cut"
         } catch {
-            errorMessage = "Failed to cut: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
     func pasteFile(targetDirectory: String) async {
         guard let sourcePath = clipboardPath, let operation = clipboardOperation else {
-            errorMessage = "No file in clipboard"
+            let message = "No file in clipboard"
+            errorMessage = message
+            notificationManager?.show(NotificationItem(message: message, type: .warning))
             return
         }
         
@@ -101,9 +117,30 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.pasteFile(sourcePath: sourcePath, targetDirectory: targetDirectory, operation: operation)
             loadFiles(path: targetDirectory)
         } catch {
-            errorMessage = "Failed to paste: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
             // Clipboard already cleared above
         }
+    }
+    
+    private func extractErrorMessage(from error: Error) -> String {
+        if let networkError = error as? NetworkError {
+            switch networkError {
+            case .httpError(let code, let message):
+                if let message = message {
+                    return message
+                }
+                return "HTTP Error \(code)"
+            case .invalidURL:
+                return "Invalid URL"
+            case .invalidResponse:
+                return "Invalid response from server"
+            case .decodingError(let decodingError):
+                return "Failed to parse response: \(decodingError.localizedDescription)"
+            }
+        }
+        return error.localizedDescription
     }
     
     func moveFile(_ file: FileItem, targetDirectory: String, currentPath: String) async {
@@ -111,7 +148,9 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.moveFile(path: file.relativePath, targetDirectory: targetDirectory)
             loadFiles(path: currentPath)
         } catch {
-            errorMessage = "Failed to move: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
@@ -120,7 +159,9 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.createFile(fileName: fileName, content: content, targetDirectory: targetDirectory)
             loadFiles(path: targetDirectory)
         } catch {
-            errorMessage = "Failed to create file: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
@@ -129,7 +170,9 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.createFolder(folderName: folderName, targetDirectory: targetDirectory)
             loadFiles(path: targetDirectory)
         } catch {
-            errorMessage = "Failed to create folder: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
     }
     
@@ -138,8 +181,32 @@ class FileExplorerViewModel: ObservableObject {
             try await networkService.uploadFile(fileData: fileData, fileName: fileName, targetDirectory: targetDirectory)
             loadFiles(path: targetDirectory)
         } catch {
-            errorMessage = "Failed to upload file: \(error.localizedDescription)"
+            let errorMsg = extractErrorMessage(from: error)
+            errorMessage = errorMsg
+            notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
         }
+    }
+    
+    func loadAllDirectories() async -> [FileItem] {
+        var allDirectories: [FileItem] = []
+        
+        func loadDirectoriesRecursively(path: String) async {
+            do {
+                let response = try await networkService.fetchFileList(path: path)
+                let dirs = response.items.filter { $0.isDirectory }
+                allDirectories.append(contentsOf: dirs)
+                
+                // Recursively load subdirectories
+                for dir in dirs {
+                    await loadDirectoriesRecursively(path: dir.relativePath)
+                }
+            } catch {
+                // Silently skip directories we can't access
+            }
+        }
+        
+        await loadDirectoriesRecursively(path: "")
+        return allDirectories
     }
     
     private func saveFileToDevice(data: Data, file: FileItem, relativePath: String) async {
@@ -223,23 +290,17 @@ class FileExplorerViewModel: ObservableObject {
             try? fileURL.setResourceValues(resourceValues)
             
             await MainActor.run {
-                // File saved successfully - show success message
+                // File saved successfully - show success notification
                 let pathDisplay: String
                 if relativePath.isEmpty {
                     pathDisplay = "FileManager/\(serverName)/\(file.name)"
                 } else {
                     pathDisplay = "FileManager/\(serverName)/\(relativePath)/\(file.name)"
                 }
-                downloadSuccessMessage = "File saved to Files app:\n\(pathDisplay)"
+                let message = "Downloaded: \(file.name)"
+                downloadSuccessMessage = message
+                notificationManager?.show(NotificationItem(message: message, type: .success, duration: 3.0))
                 print("File saved successfully to: \(fileURL.path)")
-                
-                // Clear success message after 3 seconds
-                Task {
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    await MainActor.run {
-                        downloadSuccessMessage = nil
-                    }
-                }
             }
         } catch {
             await MainActor.run {

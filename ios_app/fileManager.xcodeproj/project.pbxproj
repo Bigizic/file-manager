@@ -33,6 +33,7 @@
 		AA000053 /* ServerConnectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000054 /* ServerConnectionViewModel.swift */; };
 		AA000055 /* ServerConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000050 /* ServerConnectionView.swift */; };
 		AA000056 /* FileInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000057 /* FileInfo.swift */; };
+		AA000060 /* NotificationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000061 /* NotificationModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +64,7 @@
 		AA000054 /* ServerConnectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionViewModel.swift; sourceTree = "<group>"; };
 		AA000050 /* ServerConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionView.swift; sourceTree = "<group>"; };
 		AA000057 /* FileInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInfo.swift; sourceTree = "<group>"; };
+		AA000061 /* NotificationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationModel.swift; sourceTree = "<group>"; };
 		AA00002C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA00002D /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -130,6 +132,7 @@
 				AA000010 /* Theme.swift */,
 				AA000051 /* ServerSettings.swift */,
 				AA000057 /* FileInfo.swift */,
+				AA000061 /* NotificationModel.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -314,6 +317,7 @@
 				AA000055 /* ServerConnectionView.swift in Sources */,
 				AA000058 /* FileInfoView.swift in Sources */,
 				AA000056 /* FileInfo.swift in Sources */,
+				AA000060 /* NotificationModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

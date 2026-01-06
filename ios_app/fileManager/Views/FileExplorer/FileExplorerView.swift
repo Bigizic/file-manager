@@ -14,6 +14,10 @@ struct FileExplorerView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = FileExplorerViewModel()
     @State private var currentPath: String = ""
+    
+    init() {
+        // This will be set in onAppear
+    }
     @State private var selectedFile: FileItem?
     @State private var showPreview = false
     @State private var showFileActions = false
@@ -40,12 +44,6 @@ struct FileExplorerView: View {
         if viewModel.isLoading {
             ProgressView()
                 .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
-        } else if let successMessage = viewModel.downloadSuccessMessage {
-            successMessageView(message: successMessage)
-        } else if let error = viewModel.errorMessage {
-            FileExplorerErrorView(message: error) {
-                viewModel.loadFiles(path: currentPath)
-            }
         } else {
             fileListContent
         }
@@ -120,19 +118,6 @@ struct FileExplorerView: View {
                 showFileInfo = true
             }
         )
-    }
-    
-    private func successMessageView(message: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.green)
-            Text(message)
-                .font(.system(size: 14))
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.center)
-                .padding()
-        }
     }
     
     @ToolbarContentBuilder
@@ -236,6 +221,7 @@ struct FileExplorerView: View {
                 }
             }
             .onAppear {
+                viewModel.notificationManager = appState.notificationManager
                 viewModel.loadFiles(path: currentPath)
             }
             .sheet(isPresented: $showFileInfo) {
@@ -275,7 +261,7 @@ struct FileExplorerView: View {
                         file: file,
                         currentPath: currentPath,
                         breadcrumbs: viewModel.breadcrumbs,
-                        directories: viewModel.files.filter { $0.isDirectory },
+                        viewModel: viewModel,
                         onMove: { targetPath in
                             Task {
                                 await viewModel.moveFile(file, targetDirectory: targetPath, currentPath: currentPath)
@@ -283,6 +269,7 @@ struct FileExplorerView: View {
                             }
                         }
                     )
+                    .id(file.id) // Force new view instance when file changes
                 }
             }
             .alert("Rename", isPresented: $showRenameAlert) {
@@ -448,60 +435,73 @@ struct MoveFileView: View {
     let file: FileItem
     let currentPath: String
     let breadcrumbs: [Breadcrumb]
-    let directories: [FileItem]
+    let viewModel: FileExplorerViewModel
     let onMove: (String) -> Void
     
     @Environment(\.dismiss) var dismiss
-    @State private var selectedPath: String = ""
+    @State private var directories: [FileItem] = []
+    @State private var isLoading = true
     
     var body: some View {
         NavigationView {
-            List {
-                Section("Current Location") {
-                    Text(currentPath.isEmpty ? "Root" : currentPath)
-                        .foregroundColor(.secondary)
-                }
-                
-                Section("Parent Directories") {
-                    Button(action: {
-                        onMove("")
-                    }) {
-                        HStack {
-                            Image(systemName: "house.fill")
-                                .foregroundColor(.accentColor)
-                            Text("Root")
-                            Spacer()
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                } else {
+                    List {
+                        Section("Current Location") {
+                            Text(currentPath.isEmpty ? "Root" : currentPath)
+                                .foregroundColor(.secondary)
                         }
-                    }
-                    
-                    ForEach(breadcrumbs) { breadcrumb in
-                        if !breadcrumb.path.isEmpty {
+                        
+                        Section("Parent Directories") {
                             Button(action: {
-                                onMove(breadcrumb.path)
+                                onMove("")
                             }) {
                                 HStack {
-                                    Image(systemName: "folder.fill")
+                                    Image(systemName: "house.fill")
                                         .foregroundColor(.accentColor)
-                                    Text(breadcrumb.name)
+                                    Text("Root")
                                     Spacer()
                                 }
                             }
-                        }
-                    }
-                }
-                
-                if !directories.isEmpty {
-                    Section("Subdirectories") {
-                        ForEach(directories) { directory in
-                            Button(action: {
-                                onMove(directory.relativePath)
-                            }) {
-                                HStack {
-                                    Image(systemName: "folder.fill")
-                                        .foregroundColor(.accentColor)
-                                    Text(directory.name)
-                                    Spacer()
+                            
+                            ForEach(breadcrumbs) { breadcrumb in
+                                if !breadcrumb.path.isEmpty {
+                                    Button(action: {
+                                        onMove(breadcrumb.path)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "folder.fill")
+                                                .foregroundColor(.accentColor)
+                                            Text(breadcrumb.name)
+                                            Spacer()
+                                        }
+                                    }
                                 }
+                            }
+                        }
+                        
+                        if !directories.isEmpty {
+                            Section("Subdirectories") {
+                                ForEach(directories) { directory in
+                                    Button(action: {
+                                        onMove(directory.relativePath)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "folder.fill")
+                                                .foregroundColor(.accentColor)
+                                            Text(directory.name)
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                            }
+                        } else if !isLoading {
+                            Section {
+                                Text("No subdirectories found")
+                                    .foregroundColor(.secondary)
                             }
                         }
                     }
@@ -514,6 +514,53 @@ struct MoveFileView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                }
+            }
+            .onAppear {
+                // Reset and load directories every time view appears
+                isLoading = true
+                directories = []
+                loadDirectories()
+            }
+        }
+    }
+    
+    private func loadDirectories() {
+        Task {
+            // Load directories from current directory
+            do {
+                let response = try await viewModel.networkService.fetchFileList(path: currentPath)
+                let currentDirs = response.items.filter { $0.isDirectory }
+                
+                // Also load directories from root
+                let rootResponse = try await viewModel.networkService.fetchFileList(path: "")
+                let rootDirs = rootResponse.items.filter { $0.isDirectory }
+                
+                // Combine and remove duplicates
+                var allDirs: [FileItem] = []
+                var seenPaths: Set<String> = []
+                
+                for dir in rootDirs {
+                    if !seenPaths.contains(dir.relativePath) {
+                        allDirs.append(dir)
+                        seenPaths.insert(dir.relativePath)
+                    }
+                }
+                
+                for dir in currentDirs {
+                    if !seenPaths.contains(dir.relativePath) {
+                        allDirs.append(dir)
+                        seenPaths.insert(dir.relativePath)
+                    }
+                }
+                
+                await MainActor.run {
+                    self.directories = allDirs.sorted { $0.name < $1.name }
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
                 }
             }
         }
@@ -614,21 +661,31 @@ struct FileRowView: View {
         Task {
             do {
                 let data = try await NetworkService.shared.downloadFile(path: file.relativePath)
-                await MainActor.run {
-                    if file.isImage, let image = UIImage(data: data) {
-                        // Create thumbnail
-                        let thumbnailSize = CGSize(width: 100, height: 100)
-                        self.thumbnail = image.preparingThumbnail(of: thumbnailSize) ?? image
-                    } else if file.isVideo {
-                        // Create video thumbnail
-                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
-                        try? data.write(to: tempURL)
-                        if let thumbnail = generateVideoThumbnail(url: tempURL) {
+                
+                if file.isImage, let image = UIImage(data: data) {
+                    // Create thumbnail
+                    let thumbnailSize = CGSize(width: 100, height: 100)
+                    let thumbnail = await image.byPreparingThumbnail(ofSize: thumbnailSize) ?? image
+                    await MainActor.run {
+                        self.thumbnail = thumbnail
+                        self.isLoadingThumbnail = false
+                    }
+                } else if file.isVideo {
+                    // Create video thumbnail
+                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
+                    try? data.write(to: tempURL)
+                    let thumbnail = await generateVideoThumbnail(url: tempURL)
+                    try? FileManager.default.removeItem(at: tempURL)
+                    await MainActor.run {
+                        if let thumbnail = thumbnail {
                             self.thumbnail = thumbnail
                         }
-                        try? FileManager.default.removeItem(at: tempURL)
+                        self.isLoadingThumbnail = false
                     }
-                    self.isLoadingThumbnail = false
+                } else {
+                    await MainActor.run {
+                        self.isLoadingThumbnail = false
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -638,16 +695,19 @@ struct FileRowView: View {
         }
     }
     
-    private func generateVideoThumbnail(url: URL) -> UIImage? {
-        let asset = AVAsset(url: url)
+    private func generateVideoThumbnail(url: URL) async -> UIImage? {
+        let asset = AVURLAsset(url: url)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
         
-        do {
-            let cgImage = try imageGenerator.copyCGImage(at: CMTime.zero, actualTime: nil)
-            return UIImage(cgImage: cgImage)
-        } catch {
-            return nil
+        return await withCheckedContinuation { continuation in
+            imageGenerator.generateCGImageAsynchronously(for: CMTime.zero) { cgImage, actualTime, error in
+                if let cgImage = cgImage {
+                    continuation.resume(returning: UIImage(cgImage: cgImage))
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
         }
     }
 }
@@ -694,29 +754,6 @@ struct EmptyStateView: View {
             Text(message)
                 .font(.system(size: 16))
                 .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct FileExplorerErrorView: View {
-    let message: String
-    let retryAction: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundColor(.accentColor)
-            
-            Text(message)
-                .font(.system(size: 16))
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Button("Retry", action: retryAction)
-                .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

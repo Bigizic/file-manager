@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct FileInfoView: View {
     let file: FileItem
@@ -21,18 +22,28 @@ struct FileInfoView: View {
                     .ignoresSafeArea()
                 
                 if isLoading {
-                    ProgressView()
+                    ProgressView("Loading file information...")
                         .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
                 } else if let error = errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 48))
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(.red)
+                        
+                        Text("Error")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.primary)
                         
                         Text(error)
                             .font(.system(size: 16))
-                            .foregroundColor(.primary)
+                            .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button("OK") {
+                            dismiss()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                     .padding()
                 } else if let info = fileInfo {
@@ -104,7 +115,21 @@ struct FileInfoView: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.errorMessage = error.localizedDescription
+                    // Extract better error message
+                    if let networkError = error as? NetworkError {
+                        switch networkError {
+                        case .httpError(let code, let message):
+                            self.errorMessage = message ?? "HTTP Error \(code)"
+                        case .invalidURL:
+                            self.errorMessage = "Invalid URL"
+                        case .invalidResponse:
+                            self.errorMessage = "Invalid response from server"
+                        case .decodingError(let decodingError):
+                            self.errorMessage = "Failed to parse response: \(decodingError.localizedDescription)"
+                        }
+                    } else {
+                        self.errorMessage = error.localizedDescription
+                    }
                     self.isLoading = false
                 }
             }

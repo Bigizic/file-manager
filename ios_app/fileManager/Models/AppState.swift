@@ -15,6 +15,7 @@ class AppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var currentPath: String = ""
     @Published var isConnected: Bool = false
+    let notificationManager = NotificationManager()
     
     private init() {
         checkConnection()
