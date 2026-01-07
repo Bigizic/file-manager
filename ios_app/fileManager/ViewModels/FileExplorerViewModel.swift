@@ -41,15 +41,40 @@ class FileExplorerViewModel: ObservableObject {
     }
     
     func downloadFile(file: FileItem, relativePath: String) async {
+        // Get location string for notification
+        let location = relativePath.isEmpty ? "Root" : relativePath
+        
+        // Show initial download notification
+        await MainActor.run {
+            IOSNotificationManager.shared.showDownloadProgressNotification(
+                fileName: file.name,
+                location: location,
+                progress: 0.0
+            )
+        }
+        
         do {
-            let data = try await networkService.downloadFile(path: file.relativePath)
+            // Download with progress tracking
+            let data = try await networkService.downloadFileWithProgress(path: file.relativePath) { progress in
+                Task { @MainActor in
+                    IOSNotificationManager.shared.showDownloadProgressNotification(
+                        fileName: file.name,
+                        location: location,
+                        progress: progress
+                    )
+                }
+            }
+            
             // Save file to device with directory structure
             await saveFileToDevice(data: data, file: file, relativePath: relativePath)
         } catch {
             await MainActor.run {
                 let errorMsg = extractErrorMessage(from: error)
                 errorMessage = errorMsg
-                notificationManager?.show(NotificationItem(message: errorMsg, type: .error))
+                IOSNotificationManager.shared.showDownloadErrorNotification(
+                    fileName: file.name,
+                    error: errorMsg
+                )
             }
         }
     }

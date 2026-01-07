@@ -99,7 +99,11 @@ struct FileInfoView: View {
                     }
                 }
             }
-            .onAppear {
+            .task(id: file.id) {
+                // Reset state when file changes
+                fileInfo = nil
+                errorMessage = nil
+                isLoading = true
                 loadFileInfo()
             }
         }

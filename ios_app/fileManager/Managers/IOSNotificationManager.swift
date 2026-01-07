@@ -42,9 +42,44 @@ class IOSNotificationManager {
         }
     }
     
+    func showDownloadProgressNotification(fileName: String, location: String, progress: Double) {
+        let title = "Downloading..."
+        let progressPercent = Int(progress * 100)
+        let body = "\(fileName) from \(location)\n\(progressPercent)%"
+        
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = nil // No sound for progress updates
+        
+        let request = UNNotificationRequest(
+            identifier: "download_\(fileName)",
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error showing download progress: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     func showDownloadSuccessNotification(fileName: String, directory: String) {
+        // Remove the progress notification first
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["download_\(fileName)"])
+        
         let title = "Download Complete"
-        let body = "\(fileName) saved to \(directory) successfully"
+        let body = "\(fileName) from \(directory) downloaded successfully"
+        showNotification(title: title, body: body)
+    }
+    
+    func showDownloadErrorNotification(fileName: String, error: String) {
+        // Remove the progress notification first
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["download_\(fileName)"])
+        
+        let title = "Download Failed"
+        let body = "\(fileName): \(error)"
         showNotification(title: title, body: body)
     }
 }

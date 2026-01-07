@@ -33,7 +33,6 @@ struct FileExplorerView: View {
     @State private var fileToDelete: FileItem?
     @State private var fileToMove: FileItem?
     @State private var fileToShowInfo: FileItem?
-    @State private var showFileInfo = false
     @State private var showDocumentPicker = false
     @State private var showFileSavePicker = false
     
@@ -107,7 +106,6 @@ struct FileExplorerView: View {
             },
             onInfo: {
                 fileToShowInfo = file
-                showFileInfo = true
             }
         )
     }
@@ -240,11 +238,9 @@ struct FileExplorerView: View {
             viewModel.notificationManager = appState.notificationManager
             viewModel.loadFiles(path: currentPath)
         }
-        .sheet(isPresented: $showFileInfo) {
-                if let file = fileToShowInfo {
-                    FileInfoView(file: file)
-                }
-            }
+        .sheet(item: $fileToShowInfo) { file in
+            FileInfoView(file: file)
+        }
         .sheet(item: $selectedFile) { file in
                 FilePreviewView(
                     file: file,
@@ -265,7 +261,6 @@ struct FileExplorerView: View {
                     },
                     onInfo: {
                         fileToShowInfo = file
-                        showFileInfo = true
                     },
                     hasClipboard: viewModel.clipboardPath != nil
                 )

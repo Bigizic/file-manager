@@ -48,6 +48,8 @@ class NetworkService {
     }
     
     private let session: URLSession
+    private var progressObservers: [Int: NSKeyValueObservation] = [:]
+    private var observerLock = NSLock()
     
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -167,6 +169,59 @@ class NetworkService {
         }
         
         return data
+    }
+    
+    func downloadFileWithProgress(path: String, onProgress: @escaping (Double) -> Void) async throws -> Data {
+        let urlString = "\(effectiveBaseURL)/download/\(path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path)"
+        guard let url = URL(string: urlString) else {
+            throw NetworkError.invalidURL
+        }
+        
+        // Now download with progress tracking
+        var downloadRequest = URLRequest(url: url)
+        downloadRequest.timeoutInterval = 300 // 5 minutes for large files
+        
+        // Use URLSessionDownloadTask for better progress tracking
+        return try await withCheckedThrowingContinuation { continuation in
+            let downloadTask = session.downloadTask(with: downloadRequest) { [weak self] localURL, response, error in
+                // Clean up observer
+                self?.observerLock.lock()
+                self?.progressObservers.removeValue(forKey: downloadTask.taskIdentifier)
+                self?.observerLock.unlock()
+                
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                guard let localURL = localURL,
+                      let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    continuation.resume(throwing: NetworkError.invalidResponse)
+                    return
+                }
+                
+                do {
+                    let data = try Data(contentsOf: localURL)
+                    continuation.resume(returning: data)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            // Create a progress observer and store it
+            let observation = downloadTask.progress.observe(\.fractionCompleted) { progress, _ in
+                Task { @MainActor in
+                    onProgress(progress.fractionCompleted)
+                }
+            }
+            
+            observerLock.lock()
+            progressObservers[downloadTask.taskIdentifier] = observation
+            observerLock.unlock()
+            
+            downloadTask.resume()
+        }
     }
     
     // MARK: - File Operations
