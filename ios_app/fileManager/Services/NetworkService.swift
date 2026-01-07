@@ -183,10 +183,12 @@ class NetworkService {
         
         // Use URLSessionDownloadTask for better progress tracking
         return try await withCheckedThrowingContinuation { continuation in
+            var taskIdentifier: Int = 0
+            
             let downloadTask = session.downloadTask(with: downloadRequest) { [weak self] localURL, response, error in
                 // Clean up observer
                 self?.observerLock.lock()
-                self?.progressObservers.removeValue(forKey: downloadTask.taskIdentifier)
+                self?.progressObservers.removeValue(forKey: taskIdentifier)
                 self?.observerLock.unlock()
                 
                 if let error = error {
@@ -209,6 +211,8 @@ class NetworkService {
                 }
             }
             
+            taskIdentifier = downloadTask.taskIdentifier
+            
             // Create a progress observer and store it
             let observation = downloadTask.progress.observe(\.fractionCompleted) { progress, _ in
                 Task { @MainActor in
@@ -216,8 +220,9 @@ class NetworkService {
                 }
             }
             
+            // Store observer
             observerLock.lock()
-            progressObservers[downloadTask.taskIdentifier] = observation
+            progressObservers[taskIdentifier] = observation
             observerLock.unlock()
             
             downloadTask.resume()
