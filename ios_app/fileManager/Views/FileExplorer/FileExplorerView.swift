@@ -354,7 +354,7 @@ struct FileExplorerView: View {
                         defer {
                             url.stopAccessingSecurityScopedResource()
                         }
-                        
+
                         Task {
                             do {
                                 let data = try Data(contentsOf: url)
