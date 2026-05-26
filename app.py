@@ -10,14 +10,14 @@ import mimetypes
 import stat
 import platform
 from datetime import datetime
-from flask import Flask, render_template, send_file, abort, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template, send_file, abort, request, jsonify, redirect, url_for, flash, session, after_this_request
 from werkzeug.utils import secure_filename
 import shutil
 import json
+import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
-import mysql.connector
-from mysql.connector import Error
+import sqlite3
 
 # Load environment variables from .env file
 load_dotenv()
@@ -37,56 +37,81 @@ AUTH_PASSWORD = os.getenv('AUTH_PASSWORD', '')
 # Passkey authentication mode
 USE_PASS_KEY = os.getenv('USE_PASS_KEY', 'false').lower() == 'true'
 
-# Load MySQL configuration from environment variables
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = int(os.getenv('DB_PORT', 3306))
-DB_NAME = os.getenv('DB_NAME', 'file_explorer_db')
-DB_USER = os.getenv('DB_USER', 'file_explorer_user')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'PASSWORD_password_0000')
+# SQLite database path (override with DB_PATH in .env)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.getenv('DB_PATH', os.path.join(SCRIPT_DIR, 'file_explorer.db'))
+
+
+def _parse_db_timestamp(value):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            return datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return value
+    return value
+
+
+def _dict_factory(cursor, row):
+    columns = [column[0] for column in cursor.description]
+    parsed_row = {}
+    for column, value in zip(columns, row):
+        if column in ('created_at', 'updated_at'):
+            value = _parse_db_timestamp(value)
+        parsed_row[column] = value
+    return parsed_row
 
 
 def get_db_connection():
-    """Create and return a MySQL database connection."""
+    """Create and return a SQLite database connection."""
     try:
-        connection = mysql.connector.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
-        )
+        connection = sqlite3.connect(DB_PATH)
+        connection.row_factory = _dict_factory
         return connection
-    except Error as e:
-        print(f"Error connecting to MySQL: {e}")
+    except sqlite3.Error as e:
+        print(f"Error connecting to SQLite: {e}")
         return None
 
 
-def ensure_users_table():
-    """Ensure the users table exists in the database."""
+def init_db():
+    """Ensure SQLite database file and tables exist."""
     connection = get_db_connection()
     if not connection:
         return False
-    
+
     try:
         cursor = connection.cursor()
-        cursor.execute("""
+        cursor.executescript("""
             CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) NOT NULL UNIQUE,
-                passkey VARCHAR(255) NOT NULL,
-                has_passkey BOOLEAN DEFAULT TRUE,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                passkey TEXT NOT NULL,
+                has_passkey INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX idx_username (username),
-                INDEX idx_has_passkey (has_passkey)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_username ON users(username);
+            CREATE INDEX IF NOT EXISTS idx_has_passkey ON users(has_passkey);
+
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL DEFAULT '',
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_created_at ON notes(created_at);
+            CREATE INDEX IF NOT EXISTS idx_updated_at ON notes(updated_at);
         """)
         connection.commit()
         cursor.close()
         connection.close()
         return True
-    except Error as e:
-        print(f"Error creating users table: {e}")
+    except sqlite3.Error as e:
+        print(f"Error initializing database: {e}")
         if connection:
             connection.close()
         return False
@@ -177,7 +202,7 @@ def has_users_with_passkey():
         cursor.close()
         connection.close()
         return count > 0
-    except Error as e:
+    except sqlite3.Error as e:
         print(f"Error checking users with passkey: {e}")
         if connection:
             connection.close()
@@ -191,9 +216,9 @@ def verify_passkey(username, passkey):
         return False
     
     try:
-        cursor = connection.cursor(dictionary=True)
+        cursor = connection.cursor()
         cursor.execute(
-            "SELECT * FROM users WHERE username = %s AND has_passkey = TRUE",
+            "SELECT * FROM users WHERE username = ? AND has_passkey = TRUE",
             (username,)
         )
         user = cursor.fetchone()
@@ -203,7 +228,7 @@ def verify_passkey(username, passkey):
         if user and user['passkey'] == passkey:
             return True
         return False
-    except Error as e:
+    except sqlite3.Error as e:
         print(f"Error verifying passkey: {e}")
         if connection:
             connection.close()
@@ -219,14 +244,14 @@ def create_user_with_passkey(username, passkey):
     try:
         cursor = connection.cursor()
         cursor.execute(
-            "INSERT INTO users (username, passkey, has_passkey) VALUES (%s, %s, TRUE)",
+            "INSERT INTO users (username, passkey, has_passkey) VALUES (?, ?, TRUE)",
             (username, passkey)
         )
         connection.commit()
         cursor.close()
         connection.close()
         return True
-    except Error as e:
+    except sqlite3.Error as e:
         print(f"Error creating user: {e}")
         if connection:
             connection.close()
@@ -568,81 +593,181 @@ def preview(filepath=''):
 @require_auth
 def download(filepath=''):
     """
-    Download a file.
+    Download a file or folder (as zip).
     Security: Validates path to prevent directory traversal.
     """
     if not filepath:
-        abort(400)  # Bad request
-    
-    # Decode URL-encoded path
+        abort(400)
+
     filepath = urllib.parse.unquote(filepath)
-    
-    # Construct the full path
     full_path = os.path.join(ROOT_DIRECTORY, filepath)
-    
-    # Security check: ensure path is within allowed root
+
     if not is_safe_path(ROOT_DIRECTORY, full_path):
-        abort(403)  # Forbidden
-    
-    # Check if file exists
+        abort(403)
+
     if not os.path.exists(full_path):
-        abort(404)  # Not found
-    
-    # Check if it's a file (not a directory)
-    if not os.path.isfile(full_path):
-        abort(400)  # Bad request - not a file
-    
+        abort(404)
+
     try:
-        return send_file(full_path, as_attachment=True)
-    except Exception as e:
-        abort(500)  # Internal server error
+        if os.path.isfile(full_path):
+            return send_file(full_path, as_attachment=True)
+
+        if os.path.isdir(full_path):
+            folder_name = os.path.basename(full_path.rstrip(os.sep)) or 'folder'
+            temp_dir = tempfile.mkdtemp()
+            zip_base = os.path.join(temp_dir, folder_name)
+            zip_path = shutil.make_archive(zip_base, 'zip', full_path)
+
+            @after_this_request
+            def cleanup(response):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return response
+
+            return send_file(
+                zip_path,
+                as_attachment=True,
+                download_name=f'{folder_name}.zip',
+                mimetype='application/zip'
+            )
+
+        abort(400)
+    except Exception:
+        abort(500)
 
 
-# ==================== FILE OPERATIONS ====================
-
-@app.route('/upload', methods=['POST'])
-@require_auth
-def upload_file():
-    """Upload a file to the current directory."""
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-    
-    file = request.files['file']
-    target_dir = request.form.get('directory', '')
-    
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
-    # Construct target directory path
+def get_upload_target_directory(target_dir):
     if target_dir:
         target_dir = urllib.parse.unquote(target_dir)
         target_path = os.path.join(ROOT_DIRECTORY, target_dir)
     else:
         target_path = ROOT_DIRECTORY
-    
-    # Security check
-    if not is_safe_path(ROOT_DIRECTORY, target_path):
-        return jsonify({'error': 'Invalid directory'}), 403
-    
-    # Check if target is a directory
-    if not os.path.isdir(target_path):
-        return jsonify({'error': 'Target is not a directory'}), 400
-    
-    try:
-        # Secure filename
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(target_path, filename)
-        
-        # Check if file already exists
-        if os.path.exists(file_path):
-            return jsonify({'error': 'File already exists'}), 400
-        
-        # Save file
-        file.save(file_path)
-        return jsonify({'success': True, 'message': f'File {filename} uploaded successfully'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
+    if not is_safe_path(ROOT_DIRECTORY, target_path):
+        return None
+    if not os.path.isdir(target_path):
+        return None
+    return target_path
+
+
+def safe_path_component(name):
+    cleaned = name.replace('\\', '/').strip()
+    if not cleaned or cleaned in ('.', '..'):
+        return None
+    safe_part = secure_filename(cleaned)
+    if safe_part:
+        return safe_part
+    if cleaned.startswith('.'):
+        fallback = secure_filename(cleaned.lstrip('.'))
+        return f".{fallback}" if fallback else None
+    return None
+
+
+def safe_relative_path(relative_path):
+    relative_path = relative_path.replace('\\', '/').strip('/')
+    if not relative_path:
+        return None
+
+    parts = []
+    for part in relative_path.split('/'):
+        safe_part = safe_path_component(part)
+        if not safe_part:
+            return None
+        parts.append(safe_part)
+    return os.path.join(*parts)
+
+
+def save_uploaded_file(file_storage, target_path, relative_path=None):
+    if relative_path and ('/' in relative_path or '\\' in relative_path):
+        safe_rel = safe_relative_path(relative_path)
+        if not safe_rel:
+            raise ValueError(f'Invalid relative path: {relative_path}')
+        dest_path = os.path.join(target_path, safe_rel)
+    else:
+        filename = safe_path_component(relative_path or file_storage.filename)
+        if not filename:
+            raise ValueError(f'Invalid filename: {file_storage.filename}')
+        dest_path = os.path.join(target_path, filename)
+
+    dest_dir = os.path.dirname(dest_path)
+    if not is_safe_path(ROOT_DIRECTORY, dest_dir) or not is_safe_path(ROOT_DIRECTORY, dest_path):
+        raise ValueError('Invalid path')
+
+    os.makedirs(dest_dir, exist_ok=True)
+
+    if os.path.exists(dest_path):
+        raise ValueError(f'Already exists: {os.path.basename(dest_path)}')
+
+    file_storage.save(dest_path)
+    return dest_path
+
+
+@app.route('/upload', methods=['POST'])
+@require_auth
+def upload_file():
+    """Upload one or more files (with optional relative paths) to the current directory."""
+    target_path = get_upload_target_directory(request.form.get('directory', ''))
+    if not target_path:
+        return jsonify({'error': 'Invalid directory'}), 400
+
+    files = request.files.getlist('files')
+    relative_paths = request.form.getlist('relative_paths')
+
+    relative_paths_json = request.form.get('relative_paths_json', '').strip()
+    if relative_paths_json:
+        try:
+            relative_paths = json.loads(relative_paths_json)
+            if not isinstance(relative_paths, list):
+                raise ValueError('relative_paths_json must be a JSON array')
+        except (json.JSONDecodeError, ValueError) as e:
+            return jsonify({'error': f'Invalid relative_paths_json: {e}'}), 400
+
+    if not files and 'file' in request.files:
+        files = [request.files['file']]
+        relative_paths = ['']
+
+    if not files or all(not file or file.filename == '' for file in files):
+        return jsonify({'error': 'No file provided'}), 400
+
+    uploaded = []
+    errors = []
+
+    for index, file in enumerate(files):
+        if not file or file.filename == '':
+            continue
+
+        relative_path = relative_paths[index] if index < len(relative_paths) else ''
+        if not relative_path:
+            relative_path = None
+
+        try:
+            saved_path = save_uploaded_file(file, target_path, relative_path)
+            uploaded.append(os.path.basename(saved_path))
+        except ValueError as e:
+            errors.append(str(e))
+        except Exception as e:
+            errors.append(str(e))
+
+    if not uploaded:
+        return jsonify({'error': errors[0] if errors else 'Upload failed'}), 400
+
+    if errors:
+        return jsonify({
+            'success': True,
+            'partial': True,
+            'uploaded_count': len(uploaded),
+            'message': f'Uploaded {len(uploaded)} item(s), {len(errors)} failed',
+            'errors': errors
+        })
+
+    if len(uploaded) == 1:
+        message = f'File {uploaded[0]} uploaded successfully'
+    else:
+        message = f'Uploaded {len(uploaded)} items successfully'
+
+    return jsonify({'success': True, 'message': message, 'uploaded_count': len(uploaded)})
+
+
+# ==================== FILE OPERATIONS ====================
 
 @app.route('/create_file', methods=['POST'])
 @require_auth
@@ -1236,7 +1361,7 @@ def api_notes():
     
     if request.method == 'GET':
         try:
-            cursor = connection.cursor(dictionary=True)
+            cursor = connection.cursor()
             cursor.execute("SELECT * FROM notes ORDER BY updated_at DESC")
             notes = cursor.fetchall()
             cursor.close()
@@ -1263,7 +1388,7 @@ def api_notes():
                 formatted_notes.append(formatted_note)
             
             return jsonify({'notes': formatted_notes})
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return jsonify({'error': f"Error fetching notes: {str(e)}"}), 500
@@ -1285,7 +1410,7 @@ def api_notes():
             
             cursor = connection.cursor()
             cursor.execute(
-                "INSERT INTO notes (title, content) VALUES (%s, %s)",
+                "INSERT INTO notes (title, content) VALUES (?, ?)",
                 (title, content)
             )
             connection.commit()
@@ -1293,8 +1418,8 @@ def api_notes():
             cursor.close()
             
             # Fetch the created note
-            cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
             note = cursor.fetchone()
             cursor.close()
             connection.close()
@@ -1316,7 +1441,7 @@ def api_notes():
             }
             
             return jsonify({'note': formatted_note}), 201
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return jsonify({'error': str(e)}), 500
@@ -1336,8 +1461,8 @@ def api_note_detail(note_id):
     
     if request.method == 'GET':
         try:
-            cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
             note = cursor.fetchone()
             cursor.close()
             connection.close()
@@ -1361,7 +1486,7 @@ def api_note_detail(note_id):
                 'updated_at': updated_at
             }
             return jsonify({'note': formatted_note})
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return jsonify({'error': f"Error fetching note: {str(e)}"}), 500
@@ -1383,15 +1508,15 @@ def api_note_detail(note_id):
             
             cursor = connection.cursor()
             cursor.execute(
-                "UPDATE notes SET title = %s, content = %s WHERE id = %s",
+                "UPDATE notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (title, content, note_id)
             )
             connection.commit()
             cursor.close()
             
             # Fetch the updated note
-            cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
             note = cursor.fetchone()
             cursor.close()
             connection.close()
@@ -1415,7 +1540,7 @@ def api_note_detail(note_id):
                 'updated_at': updated_at
             }
             return jsonify({'note': formatted_note})
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return jsonify({'error': str(e)}), 500
@@ -1423,12 +1548,12 @@ def api_note_detail(note_id):
     elif request.method == 'DELETE':
         try:
             cursor = connection.cursor()
-            cursor.execute("DELETE FROM notes WHERE id = %s", (note_id,))
+            cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
             connection.commit()
             cursor.close()
             connection.close()
             return jsonify({'success': True, 'message': 'Note deleted successfully'}), 200
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return jsonify({'error': str(e)}), 500
@@ -1454,7 +1579,7 @@ def notes_list():
         return render_template('notes.html', notes=[], error="Database connection failed")
     
     try:
-        cursor = connection.cursor(dictionary=True)
+        cursor = connection.cursor()
         cursor.execute("SELECT * FROM notes ORDER BY updated_at DESC")
         notes = cursor.fetchall()
         cursor.close()
@@ -1483,7 +1608,7 @@ def notes_list():
             return jsonify({'notes': formatted_notes})
         
         return render_template('notes.html', notes=notes, error=None)
-    except Error as e:
+    except sqlite3.Error as e:
         if connection:
             connection.close()
         if json_response:
@@ -1506,7 +1631,7 @@ def create_note():
         try:
             cursor = connection.cursor()
             cursor.execute(
-                "INSERT INTO notes (title, content) VALUES (%s, %s)",
+                "INSERT INTO notes (title, content) VALUES (?, ?)",
                 (title, content)
             )
             connection.commit()
@@ -1514,7 +1639,7 @@ def create_note():
             cursor.close()
             connection.close()
             return redirect(url_for('notes_list'))
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return jsonify({'error': str(e)}), 500
@@ -1542,8 +1667,8 @@ def view_note(note_id):
                              error_message="Database connection failed"), 500
     
     try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
         note = cursor.fetchone()
         cursor.close()
         connection.close()
@@ -1572,7 +1697,7 @@ def view_note(note_id):
             return jsonify({'note': formatted_note})
         
         return render_template('note_view.html', note=note)
-    except Error as e:
+    except sqlite3.Error as e:
         if connection:
             connection.close()
         if json_response:
@@ -1599,14 +1724,14 @@ def edit_note(note_id):
         try:
             cursor = connection.cursor()
             cursor.execute(
-                "UPDATE notes SET title = %s, content = %s WHERE id = %s",
+                "UPDATE notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (title, content, note_id)
             )
             connection.commit()
             cursor.close()
             connection.close()
             return redirect(url_for('notes_list'))
-        except Error as e:
+        except sqlite3.Error as e:
             if connection:
                 connection.close()
             return render_template('error.html', 
@@ -1614,8 +1739,8 @@ def edit_note(note_id):
                                  error_message=f"Error updating note: {str(e)}"), 500
     
     try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM notes WHERE id = %s", (note_id,))
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
         note = cursor.fetchone()
         cursor.close()
         connection.close()
@@ -1624,7 +1749,7 @@ def edit_note(note_id):
             abort(404)
         
         return render_template('note_edit.html', note=note)
-    except Error as e:
+    except sqlite3.Error as e:
         if connection:
             connection.close()
         return render_template('error.html', 
@@ -1642,32 +1767,29 @@ def delete_note(note_id):
     
     try:
         cursor = connection.cursor()
-        cursor.execute("DELETE FROM notes WHERE id = %s", (note_id,))
+        cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         connection.commit()
         cursor.close()
         connection.close()
         return redirect(url_for('notes_list'))
-    except Error as e:
+    except sqlite3.Error as e:
         if connection:
             connection.close()
         return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
-    # Ensure users table exists if passkey mode is enabled
-    if USE_PASS_KEY:
-        ensure_users_table()
-    
-    # Load server configuration from environment variables
+    init_db()
+
     SERVER_HOST = os.getenv('SERVER_HOST', '0.0.0.0')
-    SERVER_PORT = int(os.getenv('SERVER_PORT', 5000))
+    SERVER_PORT = int(os.getenv('SERVER_PORT', 5005))
     FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
     print("=" * 60)
     print("Flask File Explorer")
     print("=" * 60)
     print(f"Root directory: {ROOT_DIRECTORY}")
-    print(f"Database: {DB_NAME} @ {DB_HOST}:{DB_PORT}")
+    print(f"Database: {DB_PATH}")
     print(f"Environment: {FLASK_ENV}")
     print(f"Authentication: {'Production (Enabled)' if IS_PRODUCTION else 'Development (Disabled)'}")
     if IS_PRODUCTION:

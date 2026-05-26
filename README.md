@@ -16,7 +16,6 @@ A retro-styled, offline file browser web application built with Flask. Browse an
 
 - Python 3.6 or higher
 - Flask 2.0 or higher
-- MySQL Server (for notes system)
 - python-dotenv (for environment variables)
 
 ## Installation
@@ -28,22 +27,7 @@ A retro-styled, offline file browser web application built with Flask. Browse an
 pip install -r requirements.txt
 ```
 
-3. Set up MySQL database:
-```bash
-# Make sure MySQL is installed and running
-sudo systemctl status mysql
-
-# Run the database setup script (requires sudo)
-./setup_database.sh
-```
-
-The setup script will:
-- Create the database `file_explorer_db`
-- Create user `file_explorer_user` with password `0000`
-- Create the `notes` table for the notes system
-- Grant necessary privileges
-
-**Note:** The `.env` file is already configured with the default credentials. You can modify it if needed.
+3. Run the app — SQLite database is created automatically on first start (`file_explorer.db` in the project folder). Override the path with `DB_PATH` in `.env` if needed.
 
 ## Configuration
 

@@ -30,7 +30,7 @@
                     <div class="menu-separator"></div>
                     <div class="menu-item-option" onclick="showCreateFileModal()">Create File</div>
                     <div class="menu-item-option" onclick="showCreateFolderModal()">Create Folder</div>
-                    <div class="menu-item-option" onclick="showUploadModal()">Upload File</div>
+                    <div class="menu-item-option" onclick="showUploadModal()">Upload</div>
                     <div class="menu-separator"></div>
                     <div class="menu-item-option" onclick="window.location.reload()">Refresh</div>
                 </div>
@@ -183,7 +183,7 @@
                      data-is-dir="{{ 'true' if item.is_dir else 'false' }}"
                      data-is-media="{{ 'true' if item.is_media else 'false' }}"
                      onclick="handleFileClick(event, '{{ item.relative_path }}', {{ 'true' if item.is_dir else 'false' }}, {{ 'true' if item.is_media else 'false' }})"
-                     oncontextmenu="event.preventDefault(); showContextMenu(event, '{{ item.relative_path }}', {{ 'true' if item.is_dir else 'false' }})">
+                     oncontextmenu="event.preventDefault(); showFileOptions(event, '{{ item.relative_path }}', {{ 'true' if item.is_dir else 'false' }})">
                     {% if item.is_dir %}
                         <div class="grid-icon">📁</div>
                     {% elif item.is_image %}
@@ -310,6 +310,9 @@
         <div class="context-menu-item" id="opt-info">
             <span class="ctx-icon">ℹ️</span> Information
         </div>
+        <div class="context-menu-item" id="opt-download">
+            <span class="ctx-icon">📥</span> Download
+        </div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" id="opt-rename">
             <span class="ctx-icon">✏️</span> Rename
@@ -334,8 +337,8 @@
 
     <!-- Context Menu -->
     <div id="context-menu" class="context-menu">
-        <div class="context-menu-item" id="ctx-upload-file">
-            <span class="ctx-icon">📤</span> Upload File
+        <div class="context-menu-item" id="ctx-upload">
+            <span class="ctx-icon">📤</span> Upload
         </div>
         <div class="context-menu-item" id="ctx-create-file">
             <span class="ctx-icon">📄</span> Create File
@@ -352,19 +355,20 @@
         </div>
     </div>
 
-    <!-- Upload File Modal -->
+    <!-- Upload Modal -->
     <div id="upload-modal" class="modal">
         <div class="modal-content modal-small">
             <div class="modal-title-bar">
-                <div class="modal-title-text">Upload File</div>
+                <div class="modal-title-text">Upload</div>
                 <button class="modal-close" onclick="closeModal('upload-modal')" aria-label="Close">×</button>
             </div>
             <div class="modal-body">
                 <form id="upload-form" enctype="multipart/form-data">
                     <input type="hidden" id="upload-directory" name="directory" value="{{ current_path }}">
                     <div class="form-group">
-                        <label for="file-input" class="form-label">Select File:</label>
-                        <input type="file" id="file-input" name="file" class="form-input" required>
+                        <label for="upload-input" class="form-label">Select files or folder:</label>
+                        <input type="file" id="upload-input" class="form-input" multiple required>
+                        <button type="button" class="button-secondary" id="upload-pick-folder" style="margin-top: 8px;">Choose folder</button>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="button-primary">Upload</button>

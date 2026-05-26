@@ -693,7 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.stopPropagation();
                 const path = this.dataset.path;
                 const isDir = this.dataset.isDir === 'true';
-                showContextMenu(e, path, isDir);
+                showFileOptions(e, path, isDir);
             });
             
             // Add Ctrl+Click or Cmd+Click for selection
@@ -989,7 +989,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const path = fileItem.dataset.path;
             const isDir = fileItem.dataset.isDir === 'true';
-            showContextMenu(e, path, isDir);
+            showFileOptions(e, path, isDir);
         }
     });
     
@@ -999,7 +999,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Context menu actions
-    document.getElementById('ctx-upload-file').addEventListener('click', function() {
+    document.getElementById('ctx-upload').addEventListener('click', function() {
         showUploadModal();
         hideContextMenu();
     });
@@ -1024,6 +1024,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (uploadForm) {
         uploadForm.addEventListener('submit', handleUpload);
     }
+
+    const uploadInput = document.getElementById('upload-input');
+    if (uploadInput) {
+        uploadInput.addEventListener('click', function() {
+            this.removeAttribute('webkitdirectory');
+            this.removeAttribute('directory');
+        });
+    }
+
+    const uploadPickFolder = document.getElementById('upload-pick-folder');
+    if (uploadPickFolder && uploadInput) {
+        uploadPickFolder.addEventListener('click', function() {
+            uploadInput.setAttribute('webkitdirectory', '');
+            uploadInput.setAttribute('directory', '');
+            uploadInput.click();
+        });
+    }
     
     const createFileForm = document.getElementById('create-file-form');
     if (createFileForm) {
@@ -1038,6 +1055,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function showContextMenu(e, path, isDir) {
     if (!contextMenu) return;
+
+    hideFileOptionsMenu();
     
     currentContextPath = path;
     const deleteOption = document.getElementById('ctx-delete');
@@ -1082,6 +1101,12 @@ function showUploadModal() {
     const container = document.getElementById('file-list-container');
     const currentPath = container ? container.dataset.currentPath || '' : '';
     document.getElementById('upload-directory').value = currentPath;
+    const uploadInput = document.getElementById('upload-input');
+    if (uploadInput) {
+        uploadInput.value = '';
+        uploadInput.removeAttribute('webkitdirectory');
+        uploadInput.removeAttribute('directory');
+    }
     modal.classList.add('show');
 }
 
@@ -1106,32 +1131,53 @@ function showCreateFolderModal() {
 
 function handleUpload(e) {
     e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    const fileInput = form.querySelector('#file-input');
-    const file = fileInput ? fileInput.files[0] : null;
-    
-    if (!file) {
-        showNotification('No file selected', 'error');
+    const fileInput = document.getElementById('upload-input');
+    const files = fileInput ? fileInput.files : null;
+
+    if (!files || files.length === 0) {
+        showNotification('Nothing selected', 'error');
         return;
     }
-    
-    const progressNotif = showProgressNotification(`Uploading: ${file.name}`, 'upload');
+
+    const formData = new FormData();
+    formData.append('directory', document.getElementById('upload-directory').value);
+
+    const isFolderUpload = files[0].webkitRelativePath;
+    let label;
+
+    if (isFolderUpload) {
+        const relativePaths = [];
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+            relativePaths.push(files[i].webkitRelativePath || files[i].name);
+        }
+        formData.append('relative_paths_json', JSON.stringify(relativePaths));
+        label = relativePaths[0] ? relativePaths[0].split('/')[0] : 'folder';
+    } else if (files.length === 1) {
+        formData.append('file', files[0]);
+        label = files[0].name;
+    } else {
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+        label = `${files.length} files`;
+    }
+
+    const progressNotif = showProgressNotification(`Uploading: ${label}`, 'upload');
     if (!progressNotif) {
         showNotification('Failed to initialize progress notification', 'error');
         return;
     }
-    
+
     const xhr = new XMLHttpRequest();
-    
-    // Track upload progress
-    xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-            const percent = (e.loaded / e.total) * 100;
+
+    xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+            const percent = (event.loaded / event.total) * 100;
             progressNotif.updateProgress(percent, `Uploading: ${Math.round(percent)}%`);
         }
     });
-    
+
     xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
             try {
@@ -1151,17 +1197,21 @@ function handleUpload(e) {
             progressNotif.complete('Upload failed with status: ' + xhr.status, false);
         }
     });
-    
+
     xhr.addEventListener('error', () => {
-        progressNotif.complete('Error uploading file', false);
+        progressNotif.complete('Error uploading', false);
     });
-    
+
     xhr.addEventListener('abort', () => {
         progressNotif.complete('Upload cancelled', false);
     });
-    
+
     xhr.open('POST', '/upload');
     xhr.send(formData);
+}
+
+function downloadFileOrFolder(path) {
+    window.location.href = '/download/' + encodeURIComponent(path);
 }
 
 function handleCreateFile(e) {
@@ -1248,6 +1298,7 @@ let currentFileOptionsIsDir = false;
 
 function showFileOptions(event, path, isDir) {
     event.stopPropagation();
+    hideContextMenu();
     currentFileOptionsPath = path;
     currentFileOptionsIsDir = isDir;
     
@@ -1547,6 +1598,7 @@ function moveBrowserGoHome() {
 document.addEventListener('DOMContentLoaded', function() {
     // File options menu handlers
     const optInfo = document.getElementById('opt-info');
+    const optDownload = document.getElementById('opt-download');
     const optRename = document.getElementById('opt-rename');
     const optCopy = document.getElementById('opt-copy');
     const optCut = document.getElementById('opt-cut');
@@ -1557,6 +1609,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (optInfo) {
         optInfo.addEventListener('click', function() {
             showFileInfo(currentFileOptionsPath);
+            hideFileOptionsMenu();
+        });
+    }
+
+    if (optDownload) {
+        optDownload.addEventListener('click', function() {
+            downloadFileOrFolder(currentFileOptionsPath);
             hideFileOptionsMenu();
         });
     }
